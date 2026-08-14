@@ -1,0 +1,47 @@
+name: Deploy Migrations
+
+# Vercel's native GitHub integration handles the actual app deployment
+# (build + deploy on every push to main, promote to production on tag).
+# This workflow's only job is applying database migrations to the matching
+# environment, gated by GitHub's environment protection rules — production
+# requires manual approval from a repo admin before it runs, regardless of
+# who pushed the tag.
+
+on:
+  push:
+    branches: [main]
+  release:
+    types: [published]
+
+jobs:
+  migrate-staging:
+    name: Apply migrations to staging
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+      - run: npm ci
+      - run: npm run db:migrate
+        env:
+          DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+
+  migrate-production:
+    name: Apply migrations to production (requires manual approval)
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+    environment: production # configure this GitHub Environment with required reviewers
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+      - run: npm ci
+      - run: npm run db:migrate
+        env:
+          DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
