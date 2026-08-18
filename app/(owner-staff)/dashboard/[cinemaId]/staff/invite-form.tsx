@@ -1,6 +1,7 @@
 "use client";
 
-import { useFormState, useFormStatus } from "react-dom";
+import { useFormStatus } from "react-dom";
+import { useActionState} from "react";
 import { inviteStaff } from "@/lib/actions/staff";
 import { STAFF_PERMISSION_KEYS } from "@/lib/validation/staff";
 import type { ActionResult } from "@/lib/actions/cinemas";
@@ -17,7 +18,7 @@ function SubmitButton() {
 }
 
 export function InviteStaffForm({ cinemaId }: { cinemaId: string }) {
-  const [state, formAction] = useFormState(inviteStaff, initialState);
+  const [state, formAction] = useActionState(inviteStaff, initialState);
 
   return (
     <form action={formAction}>

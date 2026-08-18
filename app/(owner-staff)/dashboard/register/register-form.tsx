@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect } from "react";
-import { useFormState, useFormStatus } from "react-dom";
+import { useActionState, useEffect } from "react";
+import { useFormStatus } from "react-dom";
 import { useRouter } from "next/navigation";
 import { registerCinema, type ActionResult } from "@/lib/actions/cinemas";
 
@@ -17,7 +17,7 @@ function SubmitButton() {
 }
 
 export function RegisterCinemaForm() {
-  const [state, formAction] = useFormState(registerCinema, initialState);
+  const [state, formAction] = useActionState(registerCinema, initialState);
   const router = useRouter();
 
   useEffect(() => {

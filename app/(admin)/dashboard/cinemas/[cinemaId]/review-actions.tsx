@@ -1,6 +1,7 @@
 "use client";
 
-import { useFormState, useFormStatus } from "react-dom";
+import { useFormStatus } from "react-dom";
+import { useActionState } from "react";
 import {
   approveCinema,
   rejectCinema,
@@ -27,10 +28,10 @@ export function CinemaReviewActions({
   cinemaId: string;
   status: "pending_review" | "approved" | "suspended" | "rejected";
 }) {
-  const [approveState, approveAction] = useFormState(approveCinema, initialState);
-  const [rejectState, rejectAction] = useFormState(rejectCinema, initialState);
-  const [suspendState, suspendAction] = useFormState(suspendCinema, initialState);
-  const [reinstateState, reinstateAction] = useFormState(reinstateCinema, initialState);
+  const [approveState, approveAction] = useActionState(approveCinema, initialState);
+  const [rejectState, rejectAction] = useActionState(rejectCinema, initialState);
+  const [suspendState, suspendAction] = useActionState(suspendCinema, initialState);
+  const [reinstateState, reinstateAction] = useActionState(reinstateCinema, initialState);
 
   return (
     <section>

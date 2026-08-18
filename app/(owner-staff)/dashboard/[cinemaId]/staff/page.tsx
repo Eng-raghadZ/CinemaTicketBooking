@@ -1,9 +1,13 @@
 import { notFound } from "next/navigation";
 import { requireCinemaStaff } from "@/lib/auth/guards";
-import { canManageCinemaStaff, type CinemaStaffMembership } from "@/lib/auth/permissions";
+import {
+  canManageCinemaStaff,
+  type CinemaStaffMembership,
+} from "@/lib/auth/permissions";
 import { createServerSupabaseClient } from "@/lib/auth/server";
 import { InviteStaffForm } from "./invite-form";
 import { RevokeStaffButton } from "./revoke-button";
+import { SignOutButton } from "@/app/(auth)/sign-out-button";
 
 interface StaffRow {
   id: string;
@@ -30,7 +34,9 @@ export default async function CinemaStaffPage({
   const supabase = await createServerSupabaseClient();
   const { data, error } = await supabase
     .from("cinema_staff")
-    .select("id, user_id, role, status, permissions, created_at, users:user_id(email, full_name)")
+    .select(
+      "id, user_id, role, status, permissions, created_at, users:user_id(email, full_name)",
+    )
     .eq("cinema_id", cinemaId)
     .order("created_at", { ascending: true });
 
@@ -45,7 +51,9 @@ export default async function CinemaStaffPage({
     .eq("status", "active")
     .maybeSingle();
 
-  const canManage = canManageCinemaStaff(callerMembership as CinemaStaffMembership | null);
+  const canManage = canManageCinemaStaff(
+    callerMembership as CinemaStaffMembership | null,
+  );
 
   return (
     <main>
@@ -67,9 +75,11 @@ export default async function CinemaStaffPage({
               <td>{row.users?.email ?? "—"}</td>
               <td>{row.role}</td>
               <td>{row.status}</td>
-              {canManage && row.status !== "revoked" && (
+              {canManage && (
                 <td>
-                  <RevokeStaffButton cinemaId={cinemaId} staffId={row.id} />
+                  {row.role !== "owner" && row.status !== "revoked" && (
+                    <RevokeStaffButton cinemaId={cinemaId} staffId={row.id} />
+                  )}
                 </td>
               )}
             </tr>
@@ -79,8 +89,13 @@ export default async function CinemaStaffPage({
 
       {canManage && <InviteStaffForm cinemaId={cinemaId} />}
       {!canManage && (
-        <p>Only the cinema owner, or a manager granted the &quot;manage staff&quot; permission, can invite or revoke staff.</p>
+        <p>
+          Only the cinema owner, or a manager granted the &quot;manage
+          staff&quot; permission, can invite or revoke staff.
+        </p>
       )}
+
+      <SignOutButton />
     </main>
   );
 }

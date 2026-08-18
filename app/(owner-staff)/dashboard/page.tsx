@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireAuthenticatedUser } from "@/lib/auth/guards";
 import { createServerSupabaseClient } from "@/lib/auth/server";
 import { AcceptInviteButton } from "./accept-invite-button";
+import { SignOutButton } from "@/app/(auth)/sign-out-button";
 
 interface MembershipRow {
   id: string;
@@ -53,8 +54,10 @@ export default async function DashboardHomePage() {
           <ul>
             {active.map((m) => (
               <li key={m.id}>
-                <Link href={`/dashboard/${m.cinemas?.id}`}>{m.cinemas?.name}</Link> — {m.role} —{" "}
-                {m.cinemas?.status}
+                <Link href={`/dashboard/${m.cinemas?.id}`}>
+                  {m.cinemas?.name}
+                </Link>{" "}
+                — {m.role} — {m.cinemas?.status}
               </li>
             ))}
           </ul>
@@ -63,6 +66,7 @@ export default async function DashboardHomePage() {
           <Link href="/dashboard/register">Register a new cinema</Link>
         </p>
       </section>
+      <SignOutButton />
     </main>
   );
 }

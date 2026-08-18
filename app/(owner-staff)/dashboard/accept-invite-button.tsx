@@ -1,6 +1,7 @@
 "use client";
 
-import { useFormState, useFormStatus } from "react-dom";
+import { useFormStatus } from "react-dom";
+import { useActionState } from "react";
 import { acceptStaffInvite } from "@/lib/actions/staff";
 import type { ActionResult } from "@/lib/actions/cinemas";
 
@@ -16,7 +17,7 @@ function SubmitButton() {
 }
 
 export function AcceptInviteButton({ staffId }: { staffId: string }) {
-  const [state, formAction] = useFormState(acceptStaffInvite, initialState);
+  const [state, formAction] = useActionState(acceptStaffInvite, initialState);
   return (
     <form action={formAction}>
       <input type="hidden" name="staffId" value={staffId} />

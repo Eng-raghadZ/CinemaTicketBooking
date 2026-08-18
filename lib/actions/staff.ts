@@ -3,8 +3,14 @@
 import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
 import { createServerSupabaseClient } from "@/lib/auth/server";
-import { requireAuthenticatedUser, requireCinemaStaff } from "@/lib/auth/guards";
-import { canManageCinemaStaff, type CinemaStaffMembership } from "@/lib/auth/permissions";
+import {
+  requireAuthenticatedUser,
+  requireCinemaStaff,
+} from "@/lib/auth/guards";
+import {
+  canManageCinemaStaff,
+  type CinemaStaffMembership,
+} from "@/lib/auth/permissions";
 import { inviteStaffSchema } from "@/lib/validation/staff";
 import { serviceDb } from "@/lib/db/client";
 import { auditLogs, users as usersTable } from "@/lib/db/schema";
@@ -23,7 +29,10 @@ import type { ActionResult } from "./cinemas";
  * Wiring an actual invite email through lib/notifications is a drop-in
  * addition later, not a redesign — same pattern as ticketing/QR in v1.
  */
-export async function inviteStaff(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+export async function inviteStaff(
+  _prev: ActionResult,
+  formData: FormData,
+): Promise<ActionResult> {
   const { userId } = await requireAuthenticatedUser();
 
   const parsed = inviteStaffSchema.safeParse({
@@ -65,7 +74,10 @@ export async function inviteStaff(_prev: ActionResult, formData: FormData): Prom
     .maybeSingle();
 
   if (!canManageCinemaStaff(callerMembership as CinemaStaffMembership | null)) {
-    return { ok: false, error: "You do not have permission to invite staff for this cinema." };
+    return {
+      ok: false,
+      error: "You do not have permission to invite staff for this cinema.",
+    };
   }
 
   // Resolving an arbitrary email to a user id needs the service-role client:
@@ -80,8 +92,75 @@ export async function inviteStaff(_prev: ActionResult, formData: FormData): Prom
   if (!invitee) {
     return {
       ok: false,
-      error: "No account found for that email. The person must sign up before being invited.",
+      error:
+        "No account found for that email. The person must sign up before being invited.",
     };
+  }
+
+  const { data: existingMembership, error: lookupError } = await supabase
+    .from("cinema_staff")
+    .select("id, role, status")
+    .eq("cinema_id", cinemaId)
+    .eq("user_id", invitee.id)
+    .maybeSingle();
+
+  if (lookupError) {
+    return {
+      ok: false,
+      error: "Could not check the existing staff membership.",
+    };
+  }
+
+  if (existingMembership) {
+    if (existingMembership.role === "owner") {
+      return {
+        ok: false,
+        error: "The cinema owner cannot be invited or modified.",
+      };
+    }
+
+    if (existingMembership.status !== "revoked") {
+      return {
+        ok: false,
+        error:
+          existingMembership.status === "active"
+            ? "This person is already an active staff member."
+            : "This person already has a pending invitation.",
+      };
+    }
+
+    const { data: reinvited, error: reinviteError } = await supabase
+      .from("cinema_staff")
+      .update({
+        role,
+        permissions,
+        invited_by: userId,
+        status: "invited",
+      })
+      .eq("id", existingMembership.id)
+      .eq("cinema_id", cinemaId)
+      .eq("status", "revoked")
+      .neq("role", "owner")
+      .select("id")
+      .maybeSingle();
+
+    if (reinviteError || !reinvited) {
+      return {
+        ok: false,
+        error: "Could not send the new invitation.",
+      };
+    }
+
+    await db.insert(auditLogs).values({
+      actorId: userId,
+      action: "cinema_staff.reinvited",
+      entity: "cinema_staff",
+      entityId: existingMembership.id,
+      metadata: { cinemaId, inviteeEmail: email, role },
+    });
+
+    revalidatePath(`/dashboard/${cinemaId}/staff`);
+    return { ok: true };
   }
 
   const { error: insertError } = await supabase.from("cinema_staff").insert({
@@ -95,7 +174,10 @@ export async function inviteStaff(_prev: ActionResult, formData: FormData): Prom
 
   if (insertError) {
     if (insertError.code === "23505") {
-      return { ok: false, error: "This person already has a staff record for this cinema." };
+      return {
+        ok: false,
+        error: "This person already has a staff record for this cinema.",
+      };
     }
     return { ok: false, error: "Could not send invite. Please try again." };
   }
@@ -112,7 +194,10 @@ export async function inviteStaff(_prev: ActionResult, formData: FormData): Prom
 }
 
 /** The invited user accepts their own invite. RLS's cinema_staff_update policy (user_id = auth.uid()) is what actually authorizes this — the query here just expresses it. */
-export async function acceptStaffInvite(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+export async function acceptStaffInvite(
+  _prev: ActionResult,
+  formData: FormData,
+): Promise<ActionResult> {
   const { userId } = await requireAuthenticatedUser();
   const staffId = formData.get("staffId");
   if (typeof staffId !== "string" || staffId.length === 0) {
@@ -130,14 +215,21 @@ export async function acceptStaffInvite(_prev: ActionResult, formData: FormData)
     .maybeSingle();
 
   if (error) return { ok: false, error: "Could not accept invite." };
-  if (!data) return { ok: false, error: "Invite not found, already accepted, or not yours." };
+  if (!data)
+    return {
+      ok: false,
+      error: "Invite not found, already accepted, or not yours.",
+    };
 
   revalidatePath("/dashboard");
   revalidatePath(`/dashboard/${data.cinema_id}/staff`);
   return { ok: true };
 }
 
-export async function revokeStaffAccess(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+export async function revokeStaffAccess(
+  _prev: ActionResult,
+  formData: FormData,
+): Promise<ActionResult> {
   const { userId } = await requireAuthenticatedUser();
   const staffId = formData.get("staffId");
   const cinemaId = formData.get("cinemaId");
@@ -157,7 +249,10 @@ export async function revokeStaffAccess(_prev: ActionResult, formData: FormData)
     .maybeSingle();
 
   if (!canManageCinemaStaff(callerMembership as CinemaStaffMembership | null)) {
-    return { ok: false, error: "You do not have permission to manage staff for this cinema." };
+    return {
+      ok: false,
+      error: "You do not have permission to manage staff for this cinema.",
+    };
   }
 
   const { data, error } = await supabase
@@ -165,11 +260,23 @@ export async function revokeStaffAccess(_prev: ActionResult, formData: FormData)
     .update({ status: "revoked" })
     .eq("id", staffId)
     .eq("cinema_id", cinemaId)
+    .neq("role", "owner")
     .select("id")
     .maybeSingle();
 
-  if (error) return { ok: false, error: "Could not revoke access." };
-  if (!data) return { ok: false, error: "Staff record not found." };
+  if (error) {
+    return {
+      ok: false,
+      error: "Could not revoke access.",
+    };
+  }
+
+  if (!data) {
+    return {
+      ok: false,
+      error: "Staff record not found or the cinema owner cannot be revoked.",
+    };
+  }
 
   const db = serviceDb();
   await db.insert(auditLogs).values({

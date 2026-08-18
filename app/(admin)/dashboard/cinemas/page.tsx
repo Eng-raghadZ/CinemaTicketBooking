@@ -1,8 +1,14 @@
 import Link from "next/link";
 import { requirePlatformAdmin } from "@/lib/auth/guards";
 import { createServerSupabaseClient } from "@/lib/auth/server";
+import { SignOutButton } from "@/app/(auth)/sign-out-button";
 
-const STATUS_TABS = ["pending_review", "approved", "suspended", "rejected"] as const;
+const STATUS_TABS = [
+  "pending_review",
+  "approved",
+  "suspended",
+  "rejected",
+] as const;
 type StatusTab = (typeof STATUS_TABS)[number];
 
 interface CinemaRow {
@@ -25,7 +31,9 @@ export default async function AdminCinemasPage({
 }) {
   await requirePlatformAdmin();
   const { status: rawStatus } = await searchParams;
-  const status: StatusTab = isStatusTab(rawStatus) ? rawStatus : "pending_review";
+  const status: StatusTab = isStatusTab(rawStatus)
+    ? rawStatus
+    : "pending_review";
 
   const supabase = await createServerSupabaseClient();
   const { data } = await supabase
@@ -39,6 +47,7 @@ export default async function AdminCinemasPage({
   return (
     <main>
       <h1>Cinema review queue</h1>
+      <SignOutButton />
       <nav aria-label="Filter by status">
         {STATUS_TABS.map((tab) => (
           <Link
@@ -57,8 +66,11 @@ export default async function AdminCinemasPage({
         <ul>
           {cinemas.map((cinema) => (
             <li key={cinema.id}>
-              <Link href={`/dashboard/cinemas/${cinema.id}`}>{cinema.name}</Link> — {cinema.country_code}{" "}
-              / {cinema.currency_code} — {new Date(cinema.created_at).toLocaleDateString()}
+              <Link href={`/dashboard/cinemas/${cinema.id}`}>
+                {cinema.name}
+              </Link>{" "}
+              — {cinema.country_code} / {cinema.currency_code} —{" "}
+              {new Date(cinema.created_at).toLocaleDateString()}
             </li>
           ))}
         </ul>

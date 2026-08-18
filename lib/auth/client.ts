@@ -1,22 +1,24 @@
 /**
- * Browser-side Supabase client. Uses the public anon key only — RLS still
- * applies to every query made through this client exactly as it does
- * server-side. Never import the service-role key into any file that could
- * end up in a client bundle.
+ * Browser-side Supabase client. Uses the public key only — RLS still
+ * applies to every browser query.
  */
 import { createBrowserClient } from "@supabase/ssr";
 
-function requireEnv(name: string): string {
-  const value = process.env[name];
-  if (!value) {
-    throw new Error(`Missing required environment variable: ${name}`);
-  }
-  return value;
-}
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabasePublicKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 export function createBrowserSupabaseClient() {
-  return createBrowserClient(
-    requireEnv("NEXT_PUBLIC_SUPABASE_URL"),
-    requireEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY"),
-  );
+  if (!supabaseUrl) {
+    throw new Error(
+      "Missing required environment variable: NEXT_PUBLIC_SUPABASE_URL",
+    );
+  }
+
+  if (!supabasePublicKey) {
+    throw new Error(
+      "Missing required environment variable: NEXT_PUBLIC_SUPABASE_ANON_KEY",
+    );
+  }
+
+  return createBrowserClient(supabaseUrl, supabasePublicKey);
 }
