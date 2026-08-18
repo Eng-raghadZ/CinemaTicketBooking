@@ -57,11 +57,11 @@ jobs:
           cache: "npm"
       - run: npm ci
 
-      - name: Create app role (mirrors Supabase's non-superuser runtime role)
+      - name: Create app_test role (non-superuser integration-test login)
         env:
           PGPASSWORD: postgres_ci_password
         run: |
-          psql -h localhost -U postgres -c "CREATE USER app WITH PASSWORD 'app_ci_password' CREATEDB;"
+          psql -h localhost -U postgres -c "CREATE USER app_test WITH PASSWORD 'app_test_password' CREATEDB;"
 
       - name: Apply local auth shim (reproduces Supabase's auth.uid()/auth.jwt())
         env:
@@ -85,7 +85,7 @@ jobs:
       - name: Run integration tests
         env:
           TEST_DATABASE_URL: postgres://postgres:postgres_ci_password@localhost:5432/cinema_platform_ci
-          APP_DATABASE_URL: postgres://app:app_ci_password@localhost:5432/cinema_platform_ci
+          APP_DATABASE_URL: postgres://app_test:app_test_password@localhost:5432/cinema_platform_ci
         run: npm run test:integration
 
   build:

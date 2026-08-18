@@ -6,7 +6,10 @@
  */
 import postgres from "postgres";
 
-const TEST_DATABASE_NAME = "cinema_platform_test";
+const ALLOWED_TEST_DATABASE_NAMES = new Set([
+  "cinema_platform_test",
+  "cinema_platform_ci",
+]);
 // IMPORTANT: asUser() below deliberately connects as the ordinary, non-superuser
 // `app_test` role rather than `postgres`. A superuser's session retains bypass
 // privileges even after `SET ROLE` to a non-superuser role in some evaluation
@@ -19,8 +22,7 @@ function requireIsolatedTestDatabaseUrl(
 
   if (!value) {
     throw new Error(
-      `${envName} is required. Integration tests must use the isolated ` +
-        `${TEST_DATABASE_NAME} database.`,
+      `${envName} is required. Integration tests must use an isolated test database.`,
     );
   }
 
@@ -34,10 +36,11 @@ function requireIsolatedTestDatabaseUrl(
 
   const databaseName = parsed.pathname.replace(/^\/+/, "");
 
-  if (databaseName !== TEST_DATABASE_NAME) {
+  if (!ALLOWED_TEST_DATABASE_NAMES.has(databaseName)) {
     throw new Error(
       `Refusing to run destructive integration tests against database ` +
-        `"${databaseName || "(missing)"}". Expected "${TEST_DATABASE_NAME}".`,
+        `"${databaseName || "(missing)"}". Expected one of: ` +
+        `${[...ALLOWED_TEST_DATABASE_NAMES].join(", ")}.`,
     );
   }
 
