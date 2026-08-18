@@ -1,5 +1,6 @@
 import { LoginForm } from "./login-form";
 import Link from "next/link";
+import { safeInternalRedirectPath } from "@/lib/auth/redirect";
 
 type LoginPageProps = {
   searchParams: Promise<{ redirectTo?: string }>;
@@ -10,10 +11,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   const requestedPath = params.redirectTo;
 
   // Prevent external/open redirects.
-  const redirectTo =
-    requestedPath?.startsWith("/") && !requestedPath.startsWith("//")
-      ? requestedPath
-      : "/dashboard";
+  const redirectTo = safeInternalRedirectPath(requestedPath);
 
   return (
     <main>

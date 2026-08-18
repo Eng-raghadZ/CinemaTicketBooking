@@ -10,14 +10,25 @@
  */
 import { revalidatePath } from "next/cache";
 import { createServerSupabaseClient } from "@/lib/auth/server";
-import { requireAuthenticatedUser, requirePlatformAdmin } from "@/lib/auth/guards";
-import { registerCinemaSchema, rejectCinemaSchema, cinemaIdSchema } from "@/lib/validation/cinema";
+import {
+  requireAuthenticatedUser,
+  requirePlatformAdmin,
+} from "@/lib/auth/guards";
+import {
+  registerCinemaSchema,
+  rejectCinemaSchema,
+  cinemaIdSchema,
+} from "@/lib/validation/cinema";
 import { serviceDb } from "@/lib/db/client";
 import { auditLogs } from "@/lib/db/schema";
 
 export type ActionResult<T = undefined> =
   | { ok: true; data?: T }
-  | { ok: false; error: string; fieldErrors?: Record<string, string[] | undefined> };
+  | {
+      ok: false;
+      error: string;
+      fieldErrors?: Record<string, string[] | undefined>;
+    };
 
 /**
  * audit_logs has NO insert policy for `authenticated` (see
@@ -99,9 +110,14 @@ export async function registerCinema(
   return { ok: true, data: { cinemaId: data.id } };
 }
 
-export async function approveCinema(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+export async function approveCinema(
+  _prev: ActionResult,
+  formData: FormData,
+): Promise<ActionResult> {
   const { userId } = await requirePlatformAdmin();
-  const parsed = cinemaIdSchema.safeParse({ cinemaId: formData.get("cinemaId") });
+  const parsed = cinemaIdSchema.safeParse({
+    cinemaId: formData.get("cinemaId"),
+  });
   if (!parsed.success) return { ok: false, error: "Invalid cinema id." };
 
   const supabase = await createServerSupabaseClient();
@@ -114,20 +130,31 @@ export async function approveCinema(_prev: ActionResult, formData: FormData): Pr
       rejection_reason: null,
     })
     .eq("id", parsed.data.cinemaId)
+    .eq("status", "pending_review")
     .select("id")
     .maybeSingle();
 
   if (error) return { ok: false, error: "Could not approve cinema." };
-  if (!data) return { ok: false, error: "Cinema not found." };
+  if (!data) {
+    return { ok: false, error: "Cinema not found or not pending review." };
+  }
 
-  await writeAuditLog({ actorId: userId, action: "cinema.approved", entity: "cinema", entityId: data.id });
+  await writeAuditLog({
+    actorId: userId,
+    action: "cinema.approved",
+    entity: "cinema",
+    entityId: data.id,
+  });
 
   revalidatePath("/dashboard/cinemas");
   revalidatePath(`/dashboard/cinemas/${data.id}`);
   return { ok: true };
 }
 
-export async function rejectCinema(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+export async function rejectCinema(
+  _prev: ActionResult,
+  formData: FormData,
+): Promise<ActionResult> {
   const { userId } = await requirePlatformAdmin();
   const parsed = rejectCinemaSchema.safeParse({
     cinemaId: formData.get("cinemaId"),
@@ -151,11 +178,14 @@ export async function rejectCinema(_prev: ActionResult, formData: FormData): Pro
       rejection_reason: parsed.data.rejectionReason,
     })
     .eq("id", parsed.data.cinemaId)
+    .eq("status", "pending_review")
     .select("id")
     .maybeSingle();
 
   if (error) return { ok: false, error: "Could not reject cinema." };
-  if (!data) return { ok: false, error: "Cinema not found." };
+  if (!data) {
+    return { ok: false, error: "Cinema not found or not pending review." };
+  }
 
   await writeAuditLog({
     actorId: userId,
@@ -170,23 +200,39 @@ export async function rejectCinema(_prev: ActionResult, formData: FormData): Pro
   return { ok: true };
 }
 
-export async function suspendCinema(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+export async function suspendCinema(
+  _prev: ActionResult,
+  formData: FormData,
+): Promise<ActionResult> {
   const { userId } = await requirePlatformAdmin();
-  const parsed = cinemaIdSchema.safeParse({ cinemaId: formData.get("cinemaId") });
+  const parsed = cinemaIdSchema.safeParse({
+    cinemaId: formData.get("cinemaId"),
+  });
   if (!parsed.success) return { ok: false, error: "Invalid cinema id." };
 
   const supabase = await createServerSupabaseClient();
   const { data, error } = await supabase
     .from("cinemas")
-    .update({ status: "suspended", reviewed_by: userId, reviewed_at: new Date().toISOString() })
+    .update({
+      status: "suspended",
+      reviewed_by: userId,
+      reviewed_at: new Date().toISOString(),
+    })
     .eq("id", parsed.data.cinemaId)
+    .eq("status", "approved")
     .select("id")
     .maybeSingle();
 
   if (error) return { ok: false, error: "Could not suspend cinema." };
-  if (!data) return { ok: false, error: "Cinema not found." };
-
-  await writeAuditLog({ actorId: userId, action: "cinema.suspended", entity: "cinema", entityId: data.id });
+  if (!data) {
+    return { ok: false, error: "Cinema not found or not currently approved." };
+  }
+  await writeAuditLog({
+    actorId: userId,
+    action: "cinema.suspended",
+    entity: "cinema",
+    entityId: data.id,
+  });
 
   revalidatePath("/dashboard/cinemas");
   revalidatePath(`/dashboard/cinemas/${data.id}`);
@@ -194,24 +240,39 @@ export async function suspendCinema(_prev: ActionResult, formData: FormData): Pr
 }
 
 /** Re-approves a previously suspended cinema. Distinct from `approveCinema` so a pending_review cinema can never be "reinstated" past review by mistake. */
-export async function reinstateCinema(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+export async function reinstateCinema(
+  _prev: ActionResult,
+  formData: FormData,
+): Promise<ActionResult> {
   const { userId } = await requirePlatformAdmin();
-  const parsed = cinemaIdSchema.safeParse({ cinemaId: formData.get("cinemaId") });
+  const parsed = cinemaIdSchema.safeParse({
+    cinemaId: formData.get("cinemaId"),
+  });
   if (!parsed.success) return { ok: false, error: "Invalid cinema id." };
 
   const supabase = await createServerSupabaseClient();
   const { data, error } = await supabase
     .from("cinemas")
-    .update({ status: "approved", reviewed_by: userId, reviewed_at: new Date().toISOString() })
+    .update({
+      status: "approved",
+      reviewed_by: userId,
+      reviewed_at: new Date().toISOString(),
+    })
     .eq("id", parsed.data.cinemaId)
     .eq("status", "suspended")
     .select("id")
     .maybeSingle();
 
   if (error) return { ok: false, error: "Could not reinstate cinema." };
-  if (!data) return { ok: false, error: "Cinema not found or not currently suspended." };
+  if (!data)
+    return { ok: false, error: "Cinema not found or not currently suspended." };
 
-  await writeAuditLog({ actorId: userId, action: "cinema.reinstated", entity: "cinema", entityId: data.id });
+  await writeAuditLog({
+    actorId: userId,
+    action: "cinema.reinstated",
+    entity: "cinema",
+    entityId: data.id,
+  });
 
   revalidatePath("/dashboard/cinemas");
   revalidatePath(`/dashboard/cinemas/${data.id}`);

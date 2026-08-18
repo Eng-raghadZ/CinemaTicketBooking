@@ -34,7 +34,7 @@ export function SignupForm() {
         data: {
           full_name: fullName.trim(),
         },
-        emailRedirectTo: `${window.location.origin}/auth/callback?next=/dashboard`,
+        emailRedirectTo: `${window.location.origin}/callback?next=/dashboard`,
       },
     });
 
