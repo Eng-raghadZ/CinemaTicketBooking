@@ -18,12 +18,36 @@ import postgres from "postgres";
 const MIGRATIONS_DIR = join(process.cwd(), "supabase", "migrations");
 
 async function main() {
-  const urlArg = process.argv.find((a) => a.startsWith("--database-url="));
-  const databaseUrl = urlArg?.split("=")[1] ?? process.env.DATABASE_URL;
+  const urlArg = process.argv.find((arg) => arg.startsWith("--database-url="));
+  const urlEnvArg = process.argv.find((arg) =>
+    arg.startsWith("--database-url-env="),
+  );
+  const urlEnvName = urlEnvArg?.slice("--database-url-env=".length);
+
+  const databaseUrl =
+    urlArg?.slice("--database-url=".length) ??
+    (urlEnvName ? process.env[urlEnvName] : process.env.DATABASE_URL);
+
+  const requireTestDatabase = process.argv.includes("--require-test-database");
 
   if (!databaseUrl) {
-    console.error("DATABASE_URL is not set (and no --database-url= passed).");
+    const expectedEnvName = urlEnvName ?? "DATABASE_URL";
+    console.error(
+      `${expectedEnvName} is not set (and no --database-url= was passed).`,
+    );
     process.exit(1);
+  }
+
+  if (requireTestDatabase) {
+    const databaseName = new URL(databaseUrl).pathname.replace(/^\/+/, "");
+
+    if (databaseName !== "cinema_platform_test") {
+      console.error(
+        `Refusing to migrate database "${databaseName || "(missing)"}". ` +
+          `Expected "cinema_platform_test".`,
+      );
+      process.exit(1);
+    }
   }
 
   const sql = postgres(databaseUrl, { max: 1 });
@@ -37,9 +61,11 @@ async function main() {
     `;
 
     const applied = new Set(
-      (await sql<{ filename: string }[]>`select filename from schema_migrations`).map(
-        (r) => r.filename,
-      ),
+      (
+        await sql<
+          { filename: string }[]
+        >`select filename from schema_migrations`
+      ).map((r) => r.filename),
     );
 
     const files = readdirSync(MIGRATIONS_DIR)

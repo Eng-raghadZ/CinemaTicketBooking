@@ -6,20 +6,52 @@
  */
 import postgres from "postgres";
 
-const TEST_DATABASE_URL =
-  process.env.TEST_DATABASE_URL ??
-  "postgres://postgres:postgres_dev_password@localhost:5432/cinema_platform_dev";
-
+const ALLOWED_TEST_DATABASE_NAMES = new Set([
+  "cinema_platform_test",
+  "cinema_platform_ci",
+]);
 // IMPORTANT: asUser() below deliberately connects as the ordinary, non-superuser
-// `app` role rather than `postgres`. A superuser's session retains bypass
+// `app_test` role rather than `postgres`. A superuser's session retains bypass
 // privileges even after `SET ROLE` to a non-superuser role in some evaluation
-// paths, which would make RLS tests pass vacuously. `app` has been granted
+// paths, which would make RLS tests pass vacuously. `app_test` has been granted
 // membership in anon/authenticated/service_role (see db:test:setup) with none
-// of BYPASSRLS/superuser, so SET ROLE here genuinely activates RLS — the same
-// as a real PostgREST/Supabase request would experience.
+function requireIsolatedTestDatabaseUrl(
+  envName: "TEST_DATABASE_URL" | "APP_DATABASE_URL",
+): string {
+  const value = process.env[envName];
+
+  if (!value) {
+    throw new Error(
+      `${envName} is required. Integration tests must use an isolated test database.`,
+    );
+  }
+
+  let parsed: URL;
+
+  try {
+    parsed = new URL(value);
+  } catch {
+    throw new Error(`${envName} is not a valid PostgreSQL URL.`);
+  }
+
+  const databaseName = parsed.pathname.replace(/^\/+/, "");
+
+  if (!ALLOWED_TEST_DATABASE_NAMES.has(databaseName)) {
+    throw new Error(
+      `Refusing to run destructive integration tests against database ` +
+        `"${databaseName || "(missing)"}". Expected one of: ` +
+        `${[...ALLOWED_TEST_DATABASE_NAMES].join(", ")}.`,
+    );
+  }
+
+  return value;
+}
+
+const TEST_DATABASE_URL =
+  requireIsolatedTestDatabaseUrl("TEST_DATABASE_URL");
+
 const APP_DATABASE_URL =
-  process.env.APP_DATABASE_URL ??
-  "postgres://app:app_dev_password@localhost:5432/cinema_platform_dev";
+  requireIsolatedTestDatabaseUrl("APP_DATABASE_URL");
 
 export function adminSql() {
   // Full-privilege connection for fixture setup (bypasses RLS as superuser).

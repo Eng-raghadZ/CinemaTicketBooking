@@ -156,6 +156,52 @@ describe("Cross-cinema tenant isolation (RLS)", () => {
     ).rejects.toThrow();
   });
 
+  it("Owner A can revoke and safely re-invite a non-owner membership", async () => {
+    await asUser({ userId: OWNER_A }, (tx) =>
+      tx`
+        update cinema_staff
+        set status = 'revoked'
+        where cinema_id = ${CINEMA_A}
+          and user_id = ${STAFF_A}
+      `,
+    );
+
+    const rows = await asUser({ userId: OWNER_A }, (tx) =>
+      tx`
+        update cinema_staff
+        set
+          status = 'invited',
+          role = 'manager',
+          permissions = '{"manage_staff": true}'::jsonb,
+          invited_by = ${OWNER_A}
+        where cinema_id = ${CINEMA_A}
+          and user_id = ${STAFF_A}
+          and status = 'revoked'
+        returning role, status, invited_by, permissions
+      `,
+    );
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      role: "manager",
+      status: "invited",
+      invited_by: OWNER_A,
+    });
+    expect(rows[0].permissions).toMatchObject({ manage_staff: true });
+  });
+
+  it("Platform admin cannot turn a non-owner membership into owner through UPDATE", async () => {
+    await expect(
+      asUser({ userId: ADMIN_USER }, (tx) =>
+        tx`
+          update cinema_staff
+          set role = 'owner'
+          where cinema_id = ${CINEMA_A}
+            and user_id = ${STAFF_A}
+        `,
+      ),
+    ).rejects.toThrow(/owner membership cannot be created through update/i);
+  });
   it("A 'staff' role member cannot write to another cinema's screens", async () => {
     await expect(
       asUser({ userId: STAFF_A }, (tx) =>
