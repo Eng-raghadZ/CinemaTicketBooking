@@ -48,6 +48,9 @@ export default async function AdminCinemasPage({
     <main>
       <h1>Cinema review queue</h1>
       <SignOutButton />
+      <nav aria-label="Admin sections">
+        <Link href="/dashboard/movies">Movie catalog</Link>
+      </nav>
       <nav aria-label="Filter by status">
         {STATUS_TABS.map((tab) => (
           <Link

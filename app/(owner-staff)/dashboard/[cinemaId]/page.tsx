@@ -52,6 +52,12 @@ export default async function CinemaDashboardPage({
 
       <nav aria-label="Cinema management">
         <Link href={`/dashboard/${cinema.id}/staff`}>Manage staff</Link>
+        {" | "}
+        <Link href={`/dashboard/${cinema.id}/movies`}>Movies</Link>
+        {" | "}
+        <Link href={`/dashboard/${cinema.id}/screens`}>Screens</Link>
+        {" | "}
+        <Link href={`/dashboard/${cinema.id}/showtimes`}>Showtimes</Link>
       </nav>
 
       <p>
