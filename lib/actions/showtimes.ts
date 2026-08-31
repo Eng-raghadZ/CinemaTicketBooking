@@ -1,19 +1,27 @@
 "use server";
 
 /**
- * Showtime creation/editing/removal. Authorization mirrors showtimes_write
- * RLS (owner/manager only). Two things this module is careful about,
- * because they were explicit prior decisions rather than obvious defaults:
+ * Showtime creation/editing/removal. Authorization mirrors the split
+ * showtimes_insert_manage_showtimes / showtimes_delete_manage_showtimes /
+ * showtimes_update_manage_pricing RLS policies
+ * (supabase/migrations/0013_catalog_permission_enforcement.sql): owner, or
+ * manager with the specific permission for that operation — scheduling
+ * (manage_showtimes) and pricing (manage_pricing) are deliberately separate
+ * keys, neither implying the other. Three things this module is careful
+ * about, because they were explicit prior decisions rather than obvious
+ * defaults:
  *
  * 1. currency_code is NEVER accepted from the client — it's always read
  *    server-side from the cinema record and copied onto the showtime.
  * 2. Overlap checking is an APP-LAYER SOFT GUARD (lib/catalog/overlap.ts),
  *    not a DB constraint — see that file's header for why, and the known
  *    race-condition gap that implies until Phase 9 hardening.
+ * 3. Scheduling (create/delete) and pricing (update) require different
+ *    permission keys — see requireCinemaCatalogPermission calls below.
  */
 import { revalidatePath } from "next/cache";
 import { createServerSupabaseClient } from "@/lib/auth/server";
-import { requireCinemaStaff } from "@/lib/auth/guards";
+import { requireCinemaCatalogPermission } from "@/lib/auth/guards";
 import {
   createShowtimeSchema,
   showtimeIdSchema,
@@ -43,7 +51,11 @@ export async function createShowtime(
   }
   const { cinemaId, screenId, movieId, startsAt, basePrice } = parsed.data;
 
-  await requireCinemaStaff(cinemaId, { minRole: "manager" });
+  // Owner, or manager explicitly granted 'manage_showtimes' — scheduling is
+  // a distinct permission from pricing (updateShowtimePrice below) and
+  // neither implies the other. See
+  // supabase/migrations/0013_catalog_permission_enforcement.sql.
+  await requireCinemaCatalogPermission(cinemaId, "manage_showtimes");
 
   const supabase = await createServerSupabaseClient();
 
@@ -157,7 +169,11 @@ export async function updateShowtimePrice(
   }
   const { cinemaId, showtimeId, basePrice } = parsed.data;
 
-  await requireCinemaStaff(cinemaId, { minRole: "manager" });
+  // Owner, or manager explicitly granted 'manage_pricing' — deliberately a
+  // different permission than the one createShowtime/deleteShowtime require,
+  // so a manager who can only adjust price cannot also add/remove
+  // showtimes, and vice versa.
+  await requireCinemaCatalogPermission(cinemaId, "manage_pricing");
 
   const supabase = await createServerSupabaseClient();
   const { data, error } = await supabase
@@ -186,7 +202,9 @@ export async function deleteShowtime(
   if (!parsed.success) return { ok: false, error: "Invalid request." };
   const { cinemaId, showtimeId } = parsed.data;
 
-  await requireCinemaStaff(cinemaId, { minRole: "manager" });
+  // Same permission as scheduling — deleting a showtime is a scheduling
+  // operation, not a pricing one.
+  await requireCinemaCatalogPermission(cinemaId, "manage_showtimes");
 
   const supabase = await createServerSupabaseClient();
   const { data, error } = await supabase

@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { requireCinemaStaff } from "@/lib/auth/guards";
-import { hasMinCinemaStaffRole } from "@/lib/auth/permissions";
+import { hasCinemaPermission, type CinemaStaffMembership } from "@/lib/auth/permissions";
 import { createServerSupabaseClient } from "@/lib/auth/server";
 import { SignOutButton } from "@/app/(auth)/sign-out-button";
 import { ShowtimeForm } from "./showtime-form";
@@ -31,30 +31,49 @@ export default async function CinemaShowtimesPage({
   params: Promise<{ cinemaId: string }>;
 }) {
   const { cinemaId } = await params;
-  const { role } = await requireCinemaStaff(cinemaId);
-  const canManage = hasMinCinemaStaffRole({ role, status: "active" }, "manager");
+  const { userId } = await requireCinemaStaff(cinemaId);
 
   const supabase = await createServerSupabaseClient();
 
-  const [{ data: showtimesData, error: showtimesError }, { data: screensData }, { data: cinemaMoviesData }] =
-    await Promise.all([
-      supabase
-        .from("showtimes")
-        .select("id, starts_at, base_price, currency_code, movies:movie_id(title, duration_minutes), screens:screen_id(name)")
-        .eq("cinema_id", cinemaId)
-        .order("starts_at", { ascending: true }),
-      supabase.from("screens").select("id, name").eq("cinema_id", cinemaId).order("name"),
-      supabase
-        .from("cinema_movies")
-        .select("movie_id, movies:movie_id(id, title, duration_minutes)")
-        .eq("cinema_id", cinemaId),
-    ]);
+  const [
+    { data: showtimesData, error: showtimesError },
+    { data: screensData },
+    { data: cinemaMoviesData },
+    { data: membership },
+  ] = await Promise.all([
+    supabase
+      .from("showtimes")
+      .select("id, starts_at, base_price, currency_code, movies:movie_id(title, duration_minutes), screens:screen_id(name)")
+      .eq("cinema_id", cinemaId)
+      .order("starts_at", { ascending: true }),
+    supabase.from("screens").select("id, name").eq("cinema_id", cinemaId).order("name"),
+    supabase
+      .from("cinema_movies")
+      .select("movie_id, movies:movie_id(id, title, duration_minutes)")
+      .eq("cinema_id", cinemaId),
+    supabase
+      .from("cinema_staff")
+      .select("role, status, permissions")
+      .eq("cinema_id", cinemaId)
+      .eq("user_id", userId)
+      .eq("status", "active")
+      .maybeSingle(),
+  ]);
 
   if (showtimesError) notFound();
 
   const showtimes = (showtimesData ?? []) as unknown as ShowtimeRow[];
   const screens = (screensData ?? []) as ScreenOption[];
   const cinemaMovies = (cinemaMoviesData ?? []) as unknown as CinemaMovieOption[];
+  const typedMembership = membership as CinemaStaffMembership | null;
+  // Two separate permissions, matching
+  // supabase/migrations/0013_catalog_permission_enforcement.sql exactly:
+  // scheduling (create/delete) requires manage_showtimes, price edits
+  // require manage_pricing. Neither implies the other, so both flags are
+  // computed independently and passed down separately.
+  const canManageShowtimes = hasCinemaPermission(typedMembership, "manage_showtimes");
+  const canManagePricing = hasCinemaPermission(typedMembership, "manage_pricing");
+  const canManageAny = canManageShowtimes || canManagePricing;
 
   return (
     <main>
@@ -73,7 +92,7 @@ export default async function CinemaShowtimesPage({
                 <th>Screen</th>
                 <th>Starts</th>
                 <th>Price</th>
-                {canManage && <th aria-label="actions" />}
+                {canManageAny && <th aria-label="actions" />}
               </tr>
             </thead>
             <tbody>
@@ -87,12 +106,14 @@ export default async function CinemaShowtimesPage({
                   <td>
                     {showtime.base_price} {showtime.currency_code}
                   </td>
-                  {canManage && (
+                  {canManageAny && (
                     <td>
                       <ShowtimeRowActions
                         cinemaId={cinemaId}
                         showtimeId={showtime.id}
                         currentPrice={showtime.base_price}
+                        canManageShowtimes={canManageShowtimes}
+                        canManagePricing={canManagePricing}
                       />
                     </td>
                   )}
@@ -103,7 +124,7 @@ export default async function CinemaShowtimesPage({
         )}
       </section>
 
-      {canManage ? (
+      {canManageShowtimes ? (
         <section>
           <h2>Schedule a new showtime</h2>
           {screens.length === 0 ? (
@@ -121,7 +142,10 @@ export default async function CinemaShowtimesPage({
           )}
         </section>
       ) : (
-        <p>Only the cinema owner or a manager can schedule showtimes.</p>
+        <p>
+          Only the cinema owner, or a manager granted the &quot;manage showtimes&quot;
+          permission, can schedule showtimes.
+        </p>
       )}
     </main>
   );

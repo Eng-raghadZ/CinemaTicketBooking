@@ -2,8 +2,9 @@
 
 /**
  * Screen creation, with seat-grid generation done in one step. Authorization
- * mirrors screens_write_owner_manager / seats_write_owner_manager RLS
- * (supabase/migrations/0005_rls_policies.sql): owner or manager only.
+ * mirrors screens_write_manage_screens / seats_write_manage_screens RLS
+ * (supabase/migrations/0013_catalog_permission_enforcement.sql): owner, or
+ * manager with the 'manage_screens' permission explicitly granted.
  *
  * The screen row and its generated seats are two separate inserts against
  * PostgREST (no multi-statement transaction available through the caller's
@@ -18,7 +19,7 @@
  */
 import { revalidatePath } from "next/cache";
 import { createServerSupabaseClient } from "@/lib/auth/server";
-import { requireCinemaStaff } from "@/lib/auth/guards";
+import { requireCinemaCatalogPermission } from "@/lib/auth/guards";
 import { createScreenSchema } from "@/lib/validation/catalog";
 import { generateSeatGrid } from "@/lib/catalog/seat-layout";
 import type { ActionResult } from "./cinemas";
@@ -44,7 +45,11 @@ export async function createScreen(
   }
   const { cinemaId, name, rows, seatsPerRow, seatType } = parsed.data;
 
-  await requireCinemaStaff(cinemaId, { minRole: "manager" });
+  // Owner, or manager explicitly granted 'manage_screens' — see
+  // supabase/migrations/0013_catalog_permission_enforcement.sql for the
+  // matching RLS-layer enforcement. A manager without this permission is
+  // rejected here before the seat grid is even generated.
+  await requireCinemaCatalogPermission(cinemaId, "manage_screens");
 
   const seats = generateSeatGrid({ rows, seatsPerRow, seatType });
   if (seats.length > 3000) {

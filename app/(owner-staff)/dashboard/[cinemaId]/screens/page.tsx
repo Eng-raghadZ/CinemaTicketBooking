@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { requireCinemaStaff } from "@/lib/auth/guards";
-import { hasMinCinemaStaffRole } from "@/lib/auth/permissions";
+import { hasCinemaPermission, type CinemaStaffMembership } from "@/lib/auth/permissions";
 import { createServerSupabaseClient } from "@/lib/auth/server";
 import { SignOutButton } from "@/app/(auth)/sign-out-button";
 import { ScreenForm } from "./screen-form";
@@ -18,18 +18,30 @@ export default async function CinemaScreensPage({
   params: Promise<{ cinemaId: string }>;
 }) {
   const { cinemaId } = await params;
-  const { role } = await requireCinemaStaff(cinemaId);
-  const canManage = hasMinCinemaStaffRole({ role, status: "active" }, "manager");
+  const { userId } = await requireCinemaStaff(cinemaId);
 
   const supabase = await createServerSupabaseClient();
-  const { data, error } = await supabase
-    .from("screens")
-    .select("id, name, layout_config, created_at")
-    .eq("cinema_id", cinemaId)
-    .order("created_at", { ascending: true });
+  const [{ data, error }, { data: membership }] = await Promise.all([
+    supabase
+      .from("screens")
+      .select("id, name, layout_config, created_at")
+      .eq("cinema_id", cinemaId)
+      .order("created_at", { ascending: true }),
+    supabase
+      .from("cinema_staff")
+      .select("role, status, permissions")
+      .eq("cinema_id", cinemaId)
+      .eq("user_id", userId)
+      .eq("status", "active")
+      .maybeSingle(),
+  ]);
 
   if (error) notFound();
   const screens = (data ?? []) as ScreenRow[];
+  // Owner, or manager explicitly granted 'manage_screens' — matches
+  // supabase/migrations/0013_catalog_permission_enforcement.sql exactly, so
+  // this button never shows for someone whose write would be rejected by RLS.
+  const canManage = hasCinemaPermission(membership as CinemaStaffMembership | null, "manage_screens");
 
   return (
     <main>
@@ -66,7 +78,10 @@ export default async function CinemaScreensPage({
           <ScreenForm cinemaId={cinemaId} />
         </section>
       ) : (
-        <p>Only the cinema owner or a manager can create screens.</p>
+        <p>
+          Only the cinema owner, or a manager granted the &quot;manage screens&quot; permission,
+          can create screens.
+        </p>
       )}
     </main>
   );

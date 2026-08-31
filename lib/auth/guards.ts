@@ -9,6 +9,8 @@
  * and defense in depth means both layers are independently correct.
  */
 import { createServerSupabaseClient } from "./server";
+import { hasCinemaPermission, type CinemaStaffMembership } from "./permissions";
+import type { StaffPermissionKey } from "@/lib/validation/staff";
 
 export class UnauthorizedError extends Error {
   constructor(message = "Authentication required") {
@@ -92,6 +94,41 @@ export async function requireCinemaStaff(
   }
 
   return { userId, role: data.role as CinemaStaffRole };
+}
+
+/**
+ * Throws ForbiddenError unless the current user is an active owner OR an
+ * active manager who has been explicitly granted `permissionKey` (Phase 2
+ * hardening — see supabase/migrations/0013_catalog_permission_enforcement.sql
+ * for the RLS-layer equivalent, `can_manage_catalog`). An owner always
+ * passes, matching that migration's semantics exactly.
+ *
+ * This is the layer-2 counterpart every catalog Server Action
+ * (lib/actions/screens.ts, lib/actions/showtimes.ts) calls before touching
+ * the database — RLS remains the authoritative backstop, this is what lets
+ * those actions return a friendly, specific error instead of a generic
+ * insert failure.
+ */
+export async function requireCinemaCatalogPermission(
+  cinemaId: string,
+  permissionKey: StaffPermissionKey,
+): Promise<{ userId: string; role: CinemaStaffRole }> {
+  const { userId } = await requireCinemaStaff(cinemaId);
+  const supabase = await createServerSupabaseClient();
+
+  const { data, error } = await supabase
+    .from("cinema_staff")
+    .select("role, status, permissions")
+    .eq("cinema_id", cinemaId)
+    .eq("user_id", userId)
+    .eq("status", "active")
+    .maybeSingle();
+
+  if (error || !hasCinemaPermission(data as CinemaStaffMembership | null, permissionKey)) {
+    throw new ForbiddenError(`Requires the "${permissionKey}" permission on this cinema`);
+  }
+
+  return { userId, role: (data as CinemaStaffMembership).role };
 }
 
 /** True if the current session belongs to a platform_admin — non-throwing variant for conditional UI logic. */

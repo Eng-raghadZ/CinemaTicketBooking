@@ -75,17 +75,24 @@ export async function removeCinemaMovie(
     .maybeSingle();
 
   if (error) {
-    // A movie still referenced by an existing showtime cannot be removed —
-    // showtimes.movie_id has no FK to cinema_movies, but removing a title
-    // out from under a scheduled showtime would silently orphan it from
-    // the cinema's own catalog view. We don't have a DB constraint for
-    // this yet, so this is intentionally left permissive at the DB layer;
-    // the UI should warn before removal (see movies/movie-list.tsx).
     return { ok: false, error: "Could not remove movie. Please try again." };
   }
   if (!data) {
     return { ok: false, error: "Movie not found in this cinema's catalog." };
   }
+
+  // Deliberately NOT re-checked against showtimes: there is no FK from
+  // showtimes to cinema_movies, and this migration's
+  // enforce_showtime_insert_integrity() (0013) only validates
+  // (cinema_id, movie_id) membership at the moment a showtime is inserted,
+  // not on an ongoing basis. So this DELETE always succeeds once the
+  // caller is authorized and the row exists — even if a showtime already
+  // scheduled for this movie still exists. That showtime is left exactly
+  // as-is; nothing here or in the database currently detects or prevents
+  // that. See docs/phase2-catalog-management.md, "removeCinemaMovie does
+  // NOT retroactively clean up existing showtimes" for the full reasoning
+  // and why this is being left as a documented limitation rather than
+  // silently redesigned in this hardening pass.
 
   revalidatePath(`/dashboard/${cinemaId}/movies`);
   return { ok: true };

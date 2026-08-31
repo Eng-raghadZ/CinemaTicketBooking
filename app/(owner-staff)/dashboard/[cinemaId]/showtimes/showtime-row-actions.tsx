@@ -20,10 +20,16 @@ export function ShowtimeRowActions({
   cinemaId,
   showtimeId,
   currentPrice,
+  canManageShowtimes,
+  canManagePricing,
 }: {
   cinemaId: string;
   showtimeId: string;
   currentPrice: string;
+  /** Gates the Delete button — matches the 'manage_showtimes' permission. */
+  canManageShowtimes: boolean;
+  /** Gates the Edit price control — matches the 'manage_pricing' permission. Deliberately independent of canManageShowtimes: neither permission implies the other. */
+  canManagePricing: boolean;
 }) {
   const [priceState, priceAction] = useActionState(updateShowtimePrice, initialState);
   const [deleteState, deleteAction] = useActionState(deleteShowtime, initialState);
@@ -31,36 +37,39 @@ export function ShowtimeRowActions({
 
   return (
     <div>
-      {editingPrice ? (
-        <form action={priceAction}>
+      {canManagePricing &&
+        (editingPrice ? (
+          <form action={priceAction}>
+            <input type="hidden" name="cinemaId" value={cinemaId} />
+            <input type="hidden" name="showtimeId" value={showtimeId} />
+            <input
+              name="basePrice"
+              type="number"
+              min={0}
+              step="0.01"
+              defaultValue={currentPrice}
+              required
+            />
+            <SubmitButton pendingLabel="Saving..." label="Save price" />
+            <button type="button" onClick={() => setEditingPrice(false)}>
+              Cancel
+            </button>
+            {!priceState.ok && priceState.error && <p role="alert">{priceState.error}</p>}
+          </form>
+        ) : (
+          <button type="button" onClick={() => setEditingPrice(true)}>
+            Edit price
+          </button>
+        ))}
+
+      {canManageShowtimes && (
+        <form action={deleteAction}>
           <input type="hidden" name="cinemaId" value={cinemaId} />
           <input type="hidden" name="showtimeId" value={showtimeId} />
-          <input
-            name="basePrice"
-            type="number"
-            min={0}
-            step="0.01"
-            defaultValue={currentPrice}
-            required
-          />
-          <SubmitButton pendingLabel="Saving..." label="Save price" />
-          <button type="button" onClick={() => setEditingPrice(false)}>
-            Cancel
-          </button>
-          {!priceState.ok && priceState.error && <p role="alert">{priceState.error}</p>}
+          <SubmitButton pendingLabel="Deleting..." label="Delete" />
+          {!deleteState.ok && deleteState.error && <p role="alert">{deleteState.error}</p>}
         </form>
-      ) : (
-        <button type="button" onClick={() => setEditingPrice(true)}>
-          Edit price
-        </button>
       )}
-
-      <form action={deleteAction}>
-        <input type="hidden" name="cinemaId" value={cinemaId} />
-        <input type="hidden" name="showtimeId" value={showtimeId} />
-        <SubmitButton pendingLabel="Deleting..." label="Delete" />
-        {!deleteState.ok && deleteState.error && <p role="alert">{deleteState.error}</p>}
-      </form>
     </div>
   );
 }
