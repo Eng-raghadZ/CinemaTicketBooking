@@ -1,23 +1,14 @@
+"use client";
+import Link from "next/link";
+import { LocalizedText } from "@/components/app-providers";
+import { SiteHeader } from "@/components/site-header";
+
 export default function HomePage() {
-  return (
-    <main>
-      <h1>Multi-Cinema Booking Platform</h1>
-      <p>
-        This is a temporary, minimal landing page — no visual design or
-        customer-facing browsing yet. See <code>docs/architecture-plan.md</code>{" "}
-        for the full roadmap.
-      </p>
-      <ul>
-        <li>Phase 0 (foundations: auth, database, RLS, CI/CD) — implemented.</li>
-        <li>
-          Phase 1 (cinema onboarding and staff management) — implemented.
-        </li>
-        <li>Phase 2 (catalog management: movies, screens, showtimes) — implemented.</li>
-        <li>
-          Public customer browsing and booking — future work, per the current
-          roadmap.
-        </li>
-      </ul>
-    </main>
-  );
+  return <div className="home-page"><SiteHeader /><main className="hero">
+    <p className="eyebrow"><LocalizedText en="The cinema, made seamless" ar="السينما، بتجربة أكثر سلاسة" /></p>
+    <h1><LocalizedText en="Every great story starts with a seat." ar="كل قصة رائعة تبدأ من مقعد." /></h1>
+    <p className="hero-copy"><LocalizedText en="Moviera brings cinemas, teams, and moviegoers together in one refined booking experience. Cinema management is available now; public booking is coming next." ar="تجمع Moviera دور السينما وفرق العمل وروّاد الأفلام في تجربة حجز واحدة متكاملة. إدارة السينما متاحة الآن، والحجز العام هو المرحلة القادمة." /></p>
+    <div className="hero-actions"><Link className="primary-button" href="/login"><LocalizedText en="Sign in to Moviera" ar="تسجيل الدخول إلى Moviera" /></Link><Link className="secondary-button" href="/signup"><LocalizedText en="Create an account" ar="إنشاء حساب" /></Link></div>
+    <p className="hero-note"><LocalizedText en="Cinema onboarding, staff access, screens, movies, and showtimes are ready." ar="تسجيل السينما وإدارة الطاقم والقاعات والأفلام ومواعيد العرض أصبحت جاهزة." /></p>
+  </main></div>;
 }

@@ -3,10 +3,12 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserSupabaseClient } from "@/lib/auth/client";
+import { useAppPreferences } from "@/components/app-providers";
 
 export function SignOutButton() {
   const router = useRouter();
   const [pending, setPending] = useState(false);
+  const { locale } = useAppPreferences();
 
   async function handleSignOut() {
     setPending(true);
@@ -19,8 +21,8 @@ export function SignOutButton() {
   }
 
   return (
-    <button type="button" onClick={handleSignOut} disabled={pending}>
-      {pending ? "Signing out..." : "Sign out"}
+    <button className="sign-out-button" type="button" onClick={handleSignOut} disabled={pending}>
+      {pending ? (locale === "ar" ? "جارٍ الخروج..." : "Signing out...") : (locale === "ar" ? "تسجيل الخروج" : "Sign out")}
     </button>
   );
 }

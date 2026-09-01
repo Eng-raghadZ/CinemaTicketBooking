@@ -1,117 +1,14 @@
 "use client";
-
+import Link from "next/link";
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserSupabaseClient } from "@/lib/auth/client";
+import { useAppPreferences } from "@/components/app-providers";
+import { SiteHeader } from "@/components/site-header";
 
 export function SignupForm() {
-  const router = useRouter();
-  const [fullName, setFullName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [message, setMessage] = useState("");
-  const [errorMessage, setErrorMessage] = useState("");
-  const [pending, setPending] = useState(false);
-
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setMessage("");
-    setErrorMessage("");
-
-    if (password !== confirmPassword) {
-      setErrorMessage("Passwords do not match.");
-      return;
-    }
-
-    setPending(true);
-
-    const supabase = createBrowserSupabaseClient();
-    const { data, error } = await supabase.auth.signUp({
-      email: email.trim().toLowerCase(),
-      password,
-      options: {
-        data: {
-          full_name: fullName.trim(),
-        },
-        emailRedirectTo: `${window.location.origin}/callback?next=/dashboard`,
-      },
-    });
-
-    if (error) {
-      setErrorMessage("Unable to create the account. Check the entered information.");
-      setPending(false);
-      return;
-    }
-
-    if (data.session) {
-      router.replace("/dashboard");
-      router.refresh();
-      return;
-    }
-
-    setMessage("Account created. Check your email to confirm your account.");
-    setPending(false);
-  }
-
-  return (
-    <form onSubmit={handleSubmit}>
-      <label>
-        Full name
-        <input
-          name="fullName"
-          autoComplete="name"
-          required
-          maxLength={200}
-          value={fullName}
-          onChange={(event) => setFullName(event.target.value)}
-        />
-      </label>
-
-      <label>
-        Email
-        <input
-          type="email"
-          name="email"
-          autoComplete="email"
-          required
-          value={email}
-          onChange={(event) => setEmail(event.target.value)}
-        />
-      </label>
-
-      <label>
-        Password
-        <input
-          type="password"
-          name="password"
-          autoComplete="new-password"
-          required
-          minLength={8}
-          value={password}
-          onChange={(event) => setPassword(event.target.value)}
-        />
-      </label>
-
-      <label>
-        Confirm password
-        <input
-          type="password"
-          name="confirmPassword"
-          autoComplete="new-password"
-          required
-          minLength={8}
-          value={confirmPassword}
-          onChange={(event) => setConfirmPassword(event.target.value)}
-        />
-      </label>
-
-      {errorMessage && <p role="alert">{errorMessage}</p>}
-      {message && <p role="status">{message}</p>}
-
-      <button type="submit" disabled={pending}>
-        {pending ? "Creating account..." : "Create account"}
-      </button>
-    </form>
-  );
+  const router=useRouter(); const {locale}=useAppPreferences(); const [fullName,setFullName]=useState(""); const [email,setEmail]=useState(""); const [password,setPassword]=useState(""); const [confirmPassword,setConfirmPassword]=useState(""); const [message,setMessage]=useState(""); const [errorMessage,setErrorMessage]=useState(""); const [pending,setPending]=useState(false);
+  const t=locale==="ar"?{eyebrow:"انضم إلى Moviera",title:"ابدأ من هنا.",story:"أنشئ حسابك لتسجيل سينما وإدارة فريقك، ولتكون جاهزًا لتجربة الحجز القادمة.",cinema:"إدارة السينما",staff:"تنظيم الطاقم",ready:"جاهز للحجز قريبًا",cardTitle:"إنشاء حساب",cardIntro:"أدخل معلوماتك الأساسية للبدء.",name:"الاسم الكامل",namePlaceholder:"الاسم الكامل",email:"البريد الإلكتروني",password:"كلمة المرور",confirm:"تأكيد كلمة المرور",mismatch:"كلمتا المرور غير متطابقتين.",failed:"تعذر إنشاء الحساب. تحقق من المعلومات المدخلة.",success:"تم إنشاء الحساب. تحقق من بريدك الإلكتروني لتأكيده.",submit:"إنشاء الحساب",pending:"جارٍ إنشاء الحساب...",hasAccount:"لديك حساب بالفعل؟",login:"سجّل الدخول"}:{eyebrow:"Join Moviera",title:"It starts right here.",story:"Create your account to register a cinema, manage your team, and be ready for the booking experience ahead.",cinema:"Cinema management",staff:"Team organization",ready:"Booking-ready",cardTitle:"Create account",cardIntro:"Enter the essentials to get started.",name:"Full name",namePlaceholder:"Your full name",email:"Email address",password:"Password",confirm:"Confirm password",mismatch:"Passwords do not match.",failed:"Unable to create the account. Check the entered information.",success:"Account created. Check your email to confirm your account.",submit:"Create account",pending:"Creating account...",hasAccount:"Already have an account?",login:"Sign in"};
+  async function handleSubmit(event:FormEvent<HTMLFormElement>){event.preventDefault();setMessage("");setErrorMessage("");if(password!==confirmPassword){setErrorMessage(t.mismatch);return;}setPending(true);const{data,error}=await createBrowserSupabaseClient().auth.signUp({email:email.trim().toLowerCase(),password,options:{data:{full_name:fullName.trim()},emailRedirectTo:`${window.location.origin}/callback?next=/dashboard`}});if(error){setErrorMessage(t.failed);setPending(false);return;}if(data.session){router.replace("/dashboard");router.refresh();return;}setMessage(t.success);setPending(false);}
+  return <div className="auth-page"><SiteHeader/><main className="auth-layout"><section className="auth-story"><p className="eyebrow">{t.eyebrow}</p><h1>{t.title}</h1><p>{t.story}</p><div className="feature-row"><span className="feature-chip">{t.cinema}</span><span className="feature-chip">{t.staff}</span><span className="feature-chip">{t.ready}</span></div></section><section className="auth-card" aria-labelledby="signup-title"><h2 id="signup-title">{t.cardTitle}</h2><p className="card-intro">{t.cardIntro}</p><form className="auth-form" onSubmit={handleSubmit}><label className="field"><span className="field-label">{t.name}</span><input name="fullName" autoComplete="name" required maxLength={200} value={fullName} placeholder={t.namePlaceholder} onChange={e=>setFullName(e.target.value)}/></label><label className="field"><span className="field-label">{t.email}</span><input type="email" name="email" autoComplete="email" required value={email} placeholder="name@example.com" onChange={e=>setEmail(e.target.value)}/></label><label className="field"><span className="field-label">{t.password}</span><input type="password" name="password" autoComplete="new-password" required minLength={8} value={password} onChange={e=>setPassword(e.target.value)}/></label><label className="field"><span className="field-label">{t.confirm}</span><input type="password" name="confirmPassword" autoComplete="new-password" required minLength={8} value={confirmPassword} onChange={e=>setConfirmPassword(e.target.value)}/></label>{errorMessage&&<p className="form-message error" role="alert">{errorMessage}</p>}{message&&<p className="form-message success" role="status">{message}</p>}<button className="primary-button" type="submit" disabled={pending}>{pending?t.pending:t.submit}</button></form><p className="auth-switch">{t.hasAccount} <Link className="text-link" href="/login">{t.login}</Link></p></section></main></div>;
 }
