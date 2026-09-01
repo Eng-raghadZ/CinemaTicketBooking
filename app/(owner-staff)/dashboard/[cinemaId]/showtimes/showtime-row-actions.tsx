@@ -1,7 +1,7 @@
 "use client";
 
 import { useFormStatus } from "react-dom";
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { updateShowtimePrice, deleteShowtime } from "@/lib/actions/showtimes";
 import type { ActionResult } from "@/lib/actions/cinemas";
 
@@ -35,6 +35,15 @@ export function ShowtimeRowActions({
   const [deleteState, deleteAction] = useActionState(deleteShowtime, initialState);
   const [editingPrice, setEditingPrice] = useState(false);
 
+  // On a successful save, collapse back to the plain "Edit price" button so
+  // the "Price updated." confirmation is shown where the user is actually
+  // looking, rather than left sitting unseen behind a still-open edit form.
+  useEffect(() => {
+    if (priceState.ok) {
+      setEditingPrice(false);
+    }
+  }, [priceState]);
+
   return (
     <div>
       {canManagePricing &&
@@ -57,9 +66,16 @@ export function ShowtimeRowActions({
             {!priceState.ok && priceState.error && <p role="alert">{priceState.error}</p>}
           </form>
         ) : (
-          <button type="button" onClick={() => setEditingPrice(true)}>
-            Edit price
-          </button>
+          <>
+            <button type="button" onClick={() => setEditingPrice(true)}>
+              Edit price
+            </button>
+            {/* Only shown right after a successful save, in the collapsed
+                view — reopening the editor (setEditingPrice(true) above)
+                hides it again, so it never lingers as a stale confirmation
+                for an unrelated later edit. */}
+            {priceState.ok && <p role="status">Price updated.</p>}
+          </>
         ))}
 
       {canManageShowtimes && (
@@ -68,6 +84,7 @@ export function ShowtimeRowActions({
           <input type="hidden" name="showtimeId" value={showtimeId} />
           <SubmitButton pendingLabel="Deleting..." label="Delete" />
           {!deleteState.ok && deleteState.error && <p role="alert">{deleteState.error}</p>}
+          {deleteState.ok && <p role="status">Showtime deleted.</p>}
         </form>
       )}
     </div>

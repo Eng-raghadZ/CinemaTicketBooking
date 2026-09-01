@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { requireCinemaStaff } from "@/lib/auth/guards";
+import { requireCinemaStaffOrRedirect } from "@/lib/auth/guards";
 import { hasMinCinemaStaffRole } from "@/lib/auth/permissions";
 import { createServerSupabaseClient } from "@/lib/auth/server";
 import { SignOutButton } from "@/app/(auth)/sign-out-button";
@@ -24,7 +24,7 @@ export default async function CinemaMoviesPage({
   params: Promise<{ cinemaId: string }>;
 }) {
   const { cinemaId } = await params;
-  const { role } = await requireCinemaStaff(cinemaId);
+  const { role } = await requireCinemaStaffOrRedirect(cinemaId);
   // Matches the RLS policy exactly: cinema_movies_write and
   // showtimes_write both check cinema_staff_role_for(...) IN
   // ('owner','manager') — a plain role-tier check, not the granular

@@ -8,6 +8,7 @@
  * "catch it" — RLS prevents data leakage, not a correct 401/403 response,
  * and defense in depth means both layers are independently correct.
  */
+import { redirect } from "next/navigation";
 import { createServerSupabaseClient } from "./server";
 import { hasCinemaPermission, type CinemaStaffMembership } from "./permissions";
 import type { StaffPermissionKey } from "@/lib/validation/staff";
@@ -24,6 +25,29 @@ export class ForbiddenError extends Error {
     super(message);
     this.name = "ForbiddenError";
   }
+}
+
+/**
+ * Friendly-redirect destinations for the two authorization errors above.
+ * Kept as plain string constants (not next/navigation calls) so the mapping
+ * function below has zero framework dependency and is trivially unit
+ * testable — see tests/unit/auth-error-routing.test.ts.
+ */
+export const LOGIN_REDIRECT_PATH = "/login";
+export const ACCESS_DENIED_REDIRECT_PATH = "/access-denied";
+
+/**
+ * Pure classification: given whatever a guard function threw, returns the
+ * friendly route it should redirect to, or `null` if this isn't one of our
+ * recognized authorization errors (in which case the caller must rethrow
+ * rather than swallow it — an unexpected error is a real bug, not an
+ * expected "you don't have access" outcome, and must not be silently
+ * turned into a redirect).
+ */
+export function resolveAuthErrorRedirectPath(error: unknown): string | null {
+  if (error instanceof UnauthorizedError) return LOGIN_REDIRECT_PATH;
+  if (error instanceof ForbiddenError) return ACCESS_DENIED_REDIRECT_PATH;
+  return null;
 }
 
 export type PlatformRole = "customer" | "cinema_owner" | "cinema_staff" | "platform_admin";
@@ -138,5 +162,46 @@ export async function isPlatformAdmin(): Promise<boolean> {
     return true;
   } catch {
     return false;
+  }
+}
+
+/**
+ * Server-Component-friendly wrapper around `requireCinemaStaff`. This does
+ * NOT change what's authorized — it calls the exact same guard (same
+ * database query, same RLS-backed authorization) and only changes what
+ * happens with the resulting error: instead of an uncaught throw reaching
+ * the user as a raw Next.js error overlay / stack trace, an expected
+ * ForbiddenError/UnauthorizedError is turned into a `redirect()` to a
+ * friendly page, using the stable App Router pattern of catching the error
+ * and calling `redirect()` from inside the `catch` block. Any OTHER error
+ * (a real bug, a database outage, etc.) is rethrown unchanged and still
+ * surfaces normally (caught by the nearest error boundary) — this wrapper
+ * only ever intercepts the two recognized, expected authorization errors.
+ */
+export async function requireCinemaStaffOrRedirect(
+  cinemaId: string,
+  opts?: { minRole?: CinemaStaffRole },
+): Promise<{ userId: string; role: CinemaStaffRole }> {
+  try {
+    return await requireCinemaStaff(cinemaId, opts);
+  } catch (error) {
+    const redirectPath = resolveAuthErrorRedirectPath(error);
+    if (redirectPath) {
+      redirect(redirectPath);
+    }
+    throw error;
+  }
+}
+
+/** Same pattern as `requireCinemaStaffOrRedirect`, for `requirePlatformAdmin`. */
+export async function requirePlatformAdminOrRedirect(): Promise<{ userId: string }> {
+  try {
+    return await requirePlatformAdmin();
+  } catch (error) {
+    const redirectPath = resolveAuthErrorRedirectPath(error);
+    if (redirectPath) {
+      redirect(redirectPath);
+    }
+    throw error;
   }
 }
