@@ -1,0 +1,54 @@
+:root {
+  --color-bg: #0c0c0c;
+  --color-panel: #161010;
+  --color-border: #3a2020;
+  --color-border-strong: #7a1414;
+  --color-accent: #8f1f1f;
+  --color-accent-bright: #c41e1e;
+  --color-text: #f5f0e8;
+  --color-text-muted: #b8b0a6;
+  --radius: 0px;
+  /* Georgia is the same serif used in the approved visual mockups —
+     kept as a plain CSS stack (no next/font/Google Fonts fetch) so
+     the build has no external network dependency. */
+  --font-display: Georgia, "Times New Roman", serif;
+  --font-body: -apple-system, "Segoe UI", "Helvetica Neue", Helvetica, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  font-weight: 500;
+  margin: 0;
+}
+
+a {
+  color: inherit;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+input {
+  font-family: inherit;
+}

@@ -1,0 +1,148 @@
+.wrapper {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+@media (max-width: 720px) {
+  .wrapper {
+    grid-template-columns: 1fr;
+  }
+}
+
+.brandPanel {
+  position: relative;
+  background: linear-gradient(160deg, #1a0808 0%, #3d0d0d 60%, var(--color-border-strong) 100%);
+  border-right: 1px solid var(--color-border-strong);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 32px;
+}
+
+@media (max-width: 720px) {
+  .brandPanel {
+    border-right: none;
+    border-bottom: 1px solid var(--color-border-strong);
+    padding: 24px 32px;
+  }
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-display);
+  font-size: 20px;
+  text-decoration: none;
+}
+
+.brandMark {
+  width: 14px;
+  height: 14px;
+  background: var(--color-text);
+  clip-path: polygon(0 0, 100% 50%, 0 100%);
+}
+
+.brandTagline {
+  color: var(--color-accent-bright);
+  font-size: 11px;
+  letter-spacing: 3px;
+  font-weight: 500;
+  margin: 0 0 10px;
+}
+
+.brandHeadline {
+  font-size: 26px;
+  line-height: 1.25;
+  max-width: 360px;
+}
+
+.formPanel {
+  padding: 56px 48px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  max-width: 440px;
+}
+
+.formEyebrow {
+  color: var(--color-accent-bright);
+  font-size: 11px;
+  letter-spacing: 3px;
+  font-weight: 500;
+  margin: 0 0 8px;
+}
+
+.formHeading {
+  font-size: 26px;
+  margin: 0 0 28px;
+}
+
+.formIntro {
+  color: var(--color-text-muted);
+  font-size: 14px;
+  margin: -18px 0 28px;
+}
+
+.field {
+  display: block;
+  margin: 0 0 20px;
+}
+
+.fieldLabel {
+  color: var(--color-text-muted);
+  font-size: 11px;
+  letter-spacing: 1px;
+  display: block;
+  margin: 0 0 6px;
+}
+
+.fieldInput {
+  width: 100%;
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  padding: 12px 14px;
+  font-size: 13px;
+  border-radius: var(--radius);
+}
+
+.fieldInput:focus {
+  outline: none;
+  border-color: var(--color-accent-bright);
+}
+
+.error {
+  color: var(--color-accent-bright);
+  font-size: 13px;
+  margin: -8px 0 20px;
+}
+
+.submit {
+  width: 100%;
+  background: var(--color-accent);
+  color: var(--color-text);
+  border: 1px solid var(--color-accent);
+  padding: 13px 24px;
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: var(--radius);
+  margin: 4px 0 16px;
+}
+
+.submit:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.signupLink {
+  color: var(--color-text-muted);
+  font-size: 13px;
+  text-align: center;
+}
+
+.signupLink a {
+  color: var(--color-text);
+  text-decoration: underline;
+}

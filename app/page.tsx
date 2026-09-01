@@ -1,23 +1,42 @@
+import Link from "next/link";
+import styles from "./page.module.css";
+
 export default function HomePage() {
   return (
-    <main>
-      <h1>Multi-Cinema Booking Platform</h1>
-      <p>
-        This is a temporary, minimal landing page — no visual design or
-        customer-facing browsing yet. See <code>docs/architecture-plan.md</code>{" "}
-        for the full roadmap.
-      </p>
-      <ul>
-        <li>Phase 0 (foundations: auth, database, RLS, CI/CD) — implemented.</li>
-        <li>
-          Phase 1 (cinema onboarding and staff management) — implemented.
-        </li>
-        <li>Phase 2 (catalog management: movies, screens, showtimes) — implemented.</li>
-        <li>
-          Public customer browsing and booking — future work, per the current
-          roadmap.
-        </li>
-      </ul>
-    </main>
+    <div className={styles.page}>
+      <nav className={styles.nav}>
+        <Link href="/" className={styles.brand}>
+          <span className={styles.brandMark} aria-hidden="true" />
+          Moviera
+        </Link>
+        <div className={styles.navLinks}>
+          <Link href="/dashboard">Dashboard</Link>
+          <Link href="/dashboard/register">Register a cinema</Link>
+          <Link href="/login" className={styles.signInButton}>Sign in</Link>
+        </div>
+      </nav>
+      <section className={styles.hero}>
+        <div className={styles.heroBackdrop} aria-hidden="true" />
+        <p className={styles.eyebrow}>THE CINEMA, MADE SEAMLESS</p>
+        <h1 className={styles.headline}>Every great story starts with a seat.</h1>
+        <p className={styles.subcopy}>
+          A platform for cinema owners and staff to manage their catalog,
+          showtimes, and teams — with public browsing and booking coming next.
+        </p>
+        <div className={styles.ctaRow}>
+          <Link href="/login" className={styles.ctaPrimary}>Sign in to Moviera</Link>
+          <Link href="/signup" className={styles.ctaSecondary}>Create an account</Link>
+        </div>
+      </section>
+      <section className={styles.status}>
+        <h2 className={styles.statusHeading}>WHERE THINGS STAND</h2>
+        <ul className={styles.statusList}>
+          <li><strong>Foundations —</strong> implemented (auth, database, RLS, CI/CD).</li>
+          <li><strong>Cinema onboarding &amp; staff —</strong> implemented.</li>
+          <li><strong>Catalog management —</strong> implemented (movies, screens, showtimes).</li>
+          <li><strong>Public browsing &amp; booking —</strong> future work.</li>
+        </ul>
+      </section>
+    </div>
   );
 }

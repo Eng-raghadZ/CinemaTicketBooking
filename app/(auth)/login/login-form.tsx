@@ -3,6 +3,7 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserSupabaseClient } from "@/lib/auth/client";
+import styles from "./login.module.css";
 
 type LoginFormProps = {
   redirectTo: string;
@@ -38,24 +39,28 @@ export function LoginForm({ redirectTo }: LoginFormProps) {
 
   return (
     <form onSubmit={handleSubmit}>
-      <label>
-        Email
+      <label className={styles.field}>
+        <span className={styles.fieldLabel}>EMAIL</span>
         <input
+          className={styles.fieldInput}
           type="email"
           name="email"
           autoComplete="email"
+          placeholder="you@example.com"
           required
           value={email}
           onChange={(event) => setEmail(event.target.value)}
         />
       </label>
 
-      <label>
-        Password
+      <label className={styles.field}>
+        <span className={styles.fieldLabel}>PASSWORD</span>
         <input
+          className={styles.fieldInput}
           type="password"
           name="password"
           autoComplete="current-password"
+          placeholder="••••••••"
           required
           minLength={8}
           value={password}
@@ -63,10 +68,14 @@ export function LoginForm({ redirectTo }: LoginFormProps) {
         />
       </label>
 
-      {errorMessage && <p role="alert">{errorMessage}</p>}
+      {errorMessage && (
+        <p role="alert" className={styles.error}>
+          {errorMessage}
+        </p>
+      )}
 
-      <button type="submit" disabled={pending}>
-        {pending ? "Signing in..." : "Sign in"}
+      <button type="submit" className={styles.submit} disabled={pending}>
+        {pending ? "Signing in..." : "Sign in to Moviera"}
       </button>
     </form>
   );
