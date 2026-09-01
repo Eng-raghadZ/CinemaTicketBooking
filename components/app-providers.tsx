@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 
 type Locale = "en" | "ar";
 type Theme = "dark" | "light";
@@ -55,7 +55,7 @@ export function useAppPreferences() {
   return context;
 }
 
-export function LocalizedText({ en, ar }: { en: string; ar: string }) {
+export function LocalizedText({ en, ar }: { en: ReactNode; ar: ReactNode }) {
   const { locale } = useAppPreferences();
   return <>{locale === "ar" ? ar : en}</>;
 }
