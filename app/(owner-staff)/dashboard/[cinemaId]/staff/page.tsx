@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { requireCinemaStaff } from "@/lib/auth/guards";
+import { requireCinemaStaffOrRedirect } from "@/lib/auth/guards";
 import {
   canManageCinemaStaff,
   type CinemaStaffMembership,
@@ -29,7 +29,7 @@ export default async function CinemaStaffPage({
   // requireCinemaStaff enforces "cannot touch another cinema" per the
   // architecture's authorization model. Whether they can INVITE/REVOKE is a
   // separate, finer-grained check below via canManageCinemaStaff.
-  const { userId } = await requireCinemaStaff(cinemaId);
+  const { userId } = await requireCinemaStaffOrRedirect(cinemaId);
 
   const supabase = await createServerSupabaseClient();
   const { data, error } = await supabase
@@ -78,7 +78,11 @@ export default async function CinemaStaffPage({
               {canManage && (
                 <td>
                   {row.role !== "owner" && row.status !== "revoked" && (
-                    <RevokeStaffButton cinemaId={cinemaId} staffId={row.id} />
+                    <RevokeStaffButton
+                      cinemaId={cinemaId}
+                      staffId={row.id}
+                      isSelf={row.user_id === userId}
+                    />
                   )}
                 </td>
               )}

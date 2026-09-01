@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { requireCinemaStaff } from "@/lib/auth/guards";
+import { requireCinemaStaffOrRedirect } from "@/lib/auth/guards";
+import { cinemaDashboardNavLabels, type CinemaStaffMembership } from "@/lib/auth/permissions";
 import { createServerSupabaseClient } from "@/lib/auth/server";
 import { SignOutButton } from "@/app/(auth)/sign-out-button";
 
@@ -13,18 +14,39 @@ export default async function CinemaDashboardPage({
 }: CinemaDashboardPageProps) {
   const { cinemaId } = await params;
 
-  await requireCinemaStaff(cinemaId);
+  const { userId } = await requireCinemaStaffOrRedirect(cinemaId);
 
   const supabase = await createServerSupabaseClient();
-  const { data: cinema, error } = await supabase
-    .from("cinemas")
-    .select("id, name, status, rejection_reason")
-    .eq("id", cinemaId)
-    .single();
+  const [{ data: cinema, error }, { data: membership }] = await Promise.all([
+    supabase
+      .from("cinemas")
+      .select("id, name, status, rejection_reason")
+      .eq("id", cinemaId)
+      .single(),
+    // Fetch the caller's own permissions (not just role) so the nav below
+    // can tell a manager with e.g. only 'manage_screens' apart from one
+    // with full catalog access — matches the same membership shape every
+    // other cinema-side page (staff/movies/screens/showtimes) already
+    // queries for its own management-UI gating.
+    supabase
+      .from("cinema_staff")
+      .select("role, status, permissions")
+      .eq("cinema_id", cinemaId)
+      .eq("user_id", userId)
+      .eq("status", "active")
+      .maybeSingle(),
+  ]);
 
   if (error || !cinema) {
     notFound();
   }
+
+  // Labels only — every link below still points to a page whose own guard
+  // (requireCinemaStaff / requireCinemaCatalogPermission) and RLS remain
+  // the actual security boundary. This purely keeps the wording honest for
+  // a read-only staff member so "Manage X" is never shown for a page they
+  // can only view.
+  const navLabels = cinemaDashboardNavLabels(membership as CinemaStaffMembership | null);
 
   return (
     <main>
@@ -51,13 +73,13 @@ export default async function CinemaDashboardPage({
       )}
 
       <nav aria-label="Cinema management">
-        <Link href={`/dashboard/${cinema.id}/staff`}>Manage staff</Link>
+        <Link href={`/dashboard/${cinema.id}/staff`}>{navLabels.staff}</Link>
         {" | "}
-        <Link href={`/dashboard/${cinema.id}/movies`}>Movies</Link>
+        <Link href={`/dashboard/${cinema.id}/movies`}>{navLabels.movies}</Link>
         {" | "}
-        <Link href={`/dashboard/${cinema.id}/screens`}>Screens</Link>
+        <Link href={`/dashboard/${cinema.id}/screens`}>{navLabels.screens}</Link>
         {" | "}
-        <Link href={`/dashboard/${cinema.id}/showtimes`}>Showtimes</Link>
+        <Link href={`/dashboard/${cinema.id}/showtimes`}>{navLabels.showtimes}</Link>
       </nav>
 
       <p>

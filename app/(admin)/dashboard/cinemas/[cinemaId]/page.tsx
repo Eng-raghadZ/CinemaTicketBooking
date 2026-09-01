@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { requirePlatformAdmin } from "@/lib/auth/guards";
+import { requirePlatformAdminOrRedirect } from "@/lib/auth/guards";
 import { createServerSupabaseClient } from "@/lib/auth/server";
 import { CinemaReviewActions } from "./review-actions";
 import { SignOutButton } from "@/app/(auth)/sign-out-button";
@@ -22,7 +22,7 @@ export default async function AdminCinemaDetailPage({
 }: {
   params: Promise<{ cinemaId: string }>;
 }) {
-  await requirePlatformAdmin();
+  await requirePlatformAdminOrRedirect();
   const { cinemaId } = await params;
 
   const supabase = await createServerSupabaseClient();

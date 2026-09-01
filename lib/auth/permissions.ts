@@ -57,3 +57,51 @@ export function hasMinCinemaStaffRole(
   if (!membership || membership.status !== "active") return false;
   return ROLE_RANK[membership.role] >= ROLE_RANK[minRole];
 }
+
+/**
+ * "Manage X" vs plain "X" — a read-only staff member should never see nav
+ * wording that implies management access they don't have (pre-UI
+ * observation: the cinema dashboard used identical management-oriented
+ * links for owners, managers, and read-only staff). One tiny pure helper
+ * instead of four copy-pasted ternaries at each call site.
+ */
+export function cinemaManagementLabel(canManage: boolean, resource: string): string {
+  const readOnlyLabel = resource.charAt(0).toUpperCase() + resource.slice(1);
+  return canManage ? `Manage ${resource}` : readOnlyLabel;
+}
+
+export interface CinemaDashboardNavLabels {
+  staff: string;
+  movies: string;
+  screens: string;
+  showtimes: string;
+}
+
+/**
+ * Computes the cinema-dashboard nav labels from one membership row,
+ * mirroring the exact permission each destination page's own management UI
+ * already requires:
+ *   - staff:     canManageCinemaStaff       (staff/page.tsx)
+ *   - movies:    hasMinCinemaStaffRole(...,'manager') (movies/page.tsx — cinema_movies_write is role-tier only, no dedicated permission key exists yet)
+ *   - screens:   hasCinemaPermission(...,'manage_screens')   (screens/page.tsx)
+ *   - showtimes: hasCinemaPermission(...,'manage_showtimes') OR
+ *                hasCinemaPermission(...,'manage_pricing')  (showtimes/page.tsx exposes
+ *                both scheduling and price-only actions on that one page)
+ * so the top-level dashboard nav never promises more management access
+ * than the destination page actually grants. Read-only staff still get
+ * every link (browsing is not restricted here) — only the wording changes.
+ */
+export function cinemaDashboardNavLabels(
+  membership: CinemaStaffMembership | null | undefined,
+): CinemaDashboardNavLabels {
+  return {
+    staff: cinemaManagementLabel(canManageCinemaStaff(membership), "staff"),
+    movies: cinemaManagementLabel(hasMinCinemaStaffRole(membership, "manager"), "movies"),
+    screens: cinemaManagementLabel(hasCinemaPermission(membership, "manage_screens"), "screens"),
+    showtimes: cinemaManagementLabel(
+      hasCinemaPermission(membership, "manage_showtimes") ||
+        hasCinemaPermission(membership, "manage_pricing"),
+      "showtimes",
+    ),
+  };
+}

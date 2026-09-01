@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { requireCinemaStaff } from "@/lib/auth/guards";
+import { requireCinemaStaffOrRedirect } from "@/lib/auth/guards";
 import { hasCinemaPermission, type CinemaStaffMembership } from "@/lib/auth/permissions";
 import { createServerSupabaseClient } from "@/lib/auth/server";
 import { SignOutButton } from "@/app/(auth)/sign-out-button";
@@ -18,7 +18,7 @@ export default async function CinemaScreensPage({
   params: Promise<{ cinemaId: string }>;
 }) {
   const { cinemaId } = await params;
-  const { userId } = await requireCinemaStaff(cinemaId);
+  const { userId } = await requireCinemaStaffOrRedirect(cinemaId);
 
   const supabase = await createServerSupabaseClient();
   const [{ data, error }, { data: membership }] = await Promise.all([

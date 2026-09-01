@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { canManageCinemaStaff, hasCinemaPermission, hasMinCinemaStaffRole } from "@/lib/auth/permissions";
+import {
+  canManageCinemaStaff,
+  cinemaDashboardNavLabels,
+  cinemaManagementLabel,
+  hasCinemaPermission,
+  hasMinCinemaStaffRole,
+} from "@/lib/auth/permissions";
 
 describe("canManageCinemaStaff", () => {
   it("returns false for a null membership", () => {
@@ -115,6 +121,90 @@ describe("hasCinemaPermission (Phase 2 hardening — generic catalog permission 
   it("canManageCinemaStaff is defined in terms of hasCinemaPermission for 'manage_staff' (no duplicated interpretation)", () => {
     const membership = { role: "manager" as const, status: "active" as const, permissions: { manage_staff: true } };
     expect(canManageCinemaStaff(membership)).toBe(hasCinemaPermission(membership, "manage_staff"));
+  });
+});
+
+describe("cinemaManagementLabel (pre-UI observation: permission-aware nav wording)", () => {
+  it("prefixes the resource with 'Manage' when the caller can manage it", () => {
+    expect(cinemaManagementLabel(true, "staff")).toBe("Manage staff");
+  });
+
+  it("returns the plain resource name when the caller cannot manage it", () => {
+    expect(cinemaManagementLabel(false, "staff")).toBe("Staff");
+  });
+});
+
+describe("cinemaDashboardNavLabels", () => {
+  it("gives an active owner full 'Manage X' wording for every link", () => {
+    const labels = cinemaDashboardNavLabels({ role: "owner", status: "active", permissions: {} });
+    expect(labels).toEqual({
+      staff: "Manage staff",
+      movies: "Manage movies",
+      screens: "Manage screens",
+      showtimes: "Manage showtimes",
+    });
+  });
+
+  it("gives a read-only 'staff' role member plain wording on every link — links are still present, not hidden", () => {
+    const labels = cinemaDashboardNavLabels({ role: "staff", status: "active", permissions: {} });
+    expect(labels).toEqual({
+      staff: "Staff",
+      movies: "Movies",
+      screens: "Screens",
+      showtimes: "Showtimes",
+    });
+  });
+
+  it("a manager only sees 'Manage X' for the specific keys they were granted", () => {
+    const labels = cinemaDashboardNavLabels({
+      role: "manager",
+      status: "active",
+      permissions: { manage_screens: true },
+    });
+    expect(labels.screens).toBe("Manage screens");
+    expect(labels.staff).toBe("Staff");
+    // movies is role-tier only (no dedicated permission key exists for
+    // cinema_movies — see the "movies" test below), so ANY active manager
+    // gets "Manage movies" regardless of which other keys they hold.
+    expect(labels.movies).toBe("Manage movies");
+    expect(labels.showtimes).toBe("Showtimes");
+  });
+
+  it("showtimes is 'Manage showtimes' if the manager holds EITHER manage_showtimes or manage_pricing (both actions live on that one page)", () => {
+    const schedulingOnly = cinemaDashboardNavLabels({
+      role: "manager",
+      status: "active",
+      permissions: { manage_showtimes: true },
+    });
+    expect(schedulingOnly.showtimes).toBe("Manage showtimes");
+
+    const pricingOnly = cinemaDashboardNavLabels({
+      role: "manager",
+      status: "active",
+      permissions: { manage_pricing: true },
+    });
+    expect(pricingOnly.showtimes).toBe("Manage showtimes");
+  });
+
+  it("movies requires at least the manager role tier (cinema_movies has no dedicated permission key yet)", () => {
+    const managerNoPerms = cinemaDashboardNavLabels({
+      role: "manager",
+      status: "active",
+      permissions: {},
+    });
+    expect(managerNoPerms.movies).toBe("Manage movies");
+
+    const staffRole = cinemaDashboardNavLabels({ role: "staff", status: "active", permissions: {} });
+    expect(staffRole.movies).toBe("Movies");
+  });
+
+  it("returns plain wording for every link when membership is null (defensive default)", () => {
+    expect(cinemaDashboardNavLabels(null)).toEqual({
+      staff: "Staff",
+      movies: "Movies",
+      screens: "Screens",
+      showtimes: "Showtimes",
+    });
   });
 });
 
