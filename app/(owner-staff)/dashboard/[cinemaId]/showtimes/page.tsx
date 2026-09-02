@@ -2,7 +2,6 @@ import { notFound } from "next/navigation";
 import { requireCinemaStaffOrRedirect } from "@/lib/auth/guards";
 import { hasCinemaPermission, type CinemaStaffMembership } from "@/lib/auth/permissions";
 import { createServerSupabaseClient } from "@/lib/auth/server";
-import { SignOutButton } from "@/app/(auth)/sign-out-button";
 import { ShowtimeForm } from "./showtime-form";
 import { ShowtimeRowActions } from "./showtime-row-actions";
 
@@ -78,7 +77,6 @@ export default async function CinemaShowtimesPage({
   return (
     <main>
       <h1>Showtimes</h1>
-      <SignOutButton />
 
       <section>
         <h2>Scheduled showtimes ({showtimes.length})</h2>

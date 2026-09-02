@@ -2,7 +2,6 @@ import { notFound } from "next/navigation";
 import { requireCinemaStaffOrRedirect } from "@/lib/auth/guards";
 import { hasCinemaPermission, type CinemaStaffMembership } from "@/lib/auth/permissions";
 import { createServerSupabaseClient } from "@/lib/auth/server";
-import { SignOutButton } from "@/app/(auth)/sign-out-button";
 import { ScreenForm } from "./screen-form";
 
 interface ScreenRow {
@@ -46,7 +45,6 @@ export default async function CinemaScreensPage({
   return (
     <main>
       <h1>Screens</h1>
-      <SignOutButton />
 
       <section>
         <h2>Existing screens ({screens.length})</h2>

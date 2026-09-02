@@ -2,7 +2,6 @@ import { notFound } from "next/navigation";
 import { requirePlatformAdminOrRedirect } from "@/lib/auth/guards";
 import { createServerSupabaseClient } from "@/lib/auth/server";
 import { CinemaReviewActions } from "./review-actions";
-import { SignOutButton } from "@/app/(auth)/sign-out-button";
 
 interface CinemaDetail {
   id: string;
@@ -62,7 +61,6 @@ export default async function AdminCinemaDetailPage({
       </dl>
 
       <CinemaReviewActions cinemaId={cinema.id} status={cinema.status} />
-      <SignOutButton />
     </main>
   );
 }

@@ -1,6 +1,5 @@
 import { requirePlatformAdmin } from "@/lib/auth/guards";
 import { createServerSupabaseClient } from "@/lib/auth/server";
-import { SignOutButton } from "@/app/(auth)/sign-out-button";
 import { MovieForm } from "./movie-form";
 
 interface MovieRow {
@@ -31,7 +30,6 @@ export default async function AdminMoviesPage() {
         This is the platform-wide master catalog. Cinema owners select from these titles for
         their own cinema&apos;s listing — they cannot create or edit catalog entries directly.
       </p>
-      <SignOutButton />
 
       <section>
         <h2>Add a movie</h2>

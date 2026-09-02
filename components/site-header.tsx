@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getCurrentUserContext } from "@/lib/auth/server";
+import { SignOutButton } from "@/app/(auth)/sign-out-button";
 
 export async function SiteHeader() {
   const user = await getCurrentUserContext();
@@ -15,9 +16,12 @@ export async function SiteHeader() {
       <nav className="site-nav" aria-label="Primary navigation">
         <Link href="/">Home</Link>
         {user ? (
-          <Link href="/dashboard">Dashboard</Link>
+          <>
+            <Link href="/dashboard">Dashboard</Link>
+            <SignOutButton className="nav-auth-action" />
+          </>
         ) : (
-          <Link className="nav-cta" href="/login">Sign In</Link>
+          <Link className="nav-auth-action" href="/login">Sign In</Link>
         )}
       </nav>
     </header>

@@ -2,7 +2,6 @@ import Link from "next/link";
 import { requireAuthenticatedUser } from "@/lib/auth/guards";
 import { createServerSupabaseClient } from "@/lib/auth/server";
 import { AcceptInviteButton } from "./accept-invite-button";
-import { SignOutButton } from "@/app/(auth)/sign-out-button";
 
 interface MembershipRow {
   id: string;
@@ -66,7 +65,6 @@ export default async function DashboardHomePage() {
           <Link href="/dashboard/register">Register a new cinema</Link>
         </p>
       </section>
-      <SignOutButton />
     </main>
   );
 }

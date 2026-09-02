@@ -16,8 +16,9 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   return (
     <main className="auth-page login-page">
       <section className="auth-story login-story">
-        <p className="eyebrow">CINEMA OPERATIONS</p>
-        <h1>Welcome back</h1>
+        <p className="eyebrow">MOVIERA ACCESS</p>
+        <h1>Your cinema. Your team. One control room.</h1>
+        <p>Return to the management workspace for your cinemas, staff, screens, movies, and showtimes.</p>
       </section>
       <section className="auth-panel login-panel">
         <h2>Sign in</h2>

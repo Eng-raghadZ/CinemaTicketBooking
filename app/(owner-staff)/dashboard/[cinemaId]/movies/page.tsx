@@ -2,7 +2,6 @@ import { notFound } from "next/navigation";
 import { requireCinemaStaffOrRedirect } from "@/lib/auth/guards";
 import { hasMinCinemaStaffRole } from "@/lib/auth/permissions";
 import { createServerSupabaseClient } from "@/lib/auth/server";
-import { SignOutButton } from "@/app/(auth)/sign-out-button";
 import { AddMovieForm } from "./add-movie-form";
 import { RemoveMovieButton } from "./remove-movie-button";
 
@@ -59,7 +58,6 @@ export default async function CinemaMoviesPage({
     <main>
       <h1>Movies</h1>
       <p>Select which titles from the platform catalog this cinema shows.</p>
-      <SignOutButton />
 
       <section>
         <h2>Currently showing ({cinemaMovies.length})</h2>

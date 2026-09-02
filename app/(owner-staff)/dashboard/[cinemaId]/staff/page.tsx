@@ -7,7 +7,6 @@ import {
 import { createServerSupabaseClient } from "@/lib/auth/server";
 import { InviteStaffForm } from "./invite-form";
 import { RevokeStaffButton } from "./revoke-button";
-import { SignOutButton } from "@/app/(auth)/sign-out-button";
 
 interface StaffRow {
   id: string;
@@ -99,7 +98,6 @@ export default async function CinemaStaffPage({
         </p>
       )}
 
-      <SignOutButton />
     </main>
   );
 }
