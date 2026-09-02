@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 export function SiteHeader() {
   const pathname = usePathname();
   const onAuthPage = pathname === "/login" || pathname === "/signup";
+  const onDashboard = pathname.startsWith("/dashboard");
   return (
     <header className="site-header">
       <Link className="site-brand" href="/" aria-label="Moviera home">
@@ -15,7 +16,7 @@ export function SiteHeader() {
         <Link className={pathname === "/" ? "active" : ""} href="/">Home</Link>
         <Link className={pathname.startsWith("/dashboard") ? "active" : ""} href="/dashboard">Dashboard</Link>
         <Link href="/dashboard/register">Register cinema</Link>
-        {!onAuthPage && <Link className="nav-cta" href="/login">Sign in</Link>}
+        {!onAuthPage && !onDashboard && <Link className="nav-cta" href="/login">Sign in</Link>}
       </nav>
     </header>
   );
