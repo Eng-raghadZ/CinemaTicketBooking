@@ -4,17 +4,12 @@ export default function HomePage() {
   return (
     <main className="home-main">
       <section className="home-hero">
-        <div className="hero-art" aria-hidden="true">
-          <span className="film-frame frame-one" />
-          <span className="film-frame frame-two" />
-          <span className="hero-glow" />
-        </div>
         <div className="hero-content">
-          <p className="eyebrow">THE CINEMA, MADE SEAMLESS</p>
-          <h1>Run every screen from one place.</h1>
+          <p className="eyebrow">CINEMA OPERATIONS</p>
+          <h1>Every screen.<br />One platform.</h1>
           <p className="hero-copy">
-            Manage cinema onboarding, staff access, movies, screens, and showtimes
-            through one focused platform.
+            Manage your cinema, team, movies, screens<br className="desktop-break" />
+            and showtimes from one focused workspace.
           </p>
           <div className="hero-actions">
             <Link className="button-primary" href="/login">Sign in to Moviera</Link>
@@ -23,9 +18,9 @@ export default function HomePage() {
         </div>
       </section>
       <section className="capability-strip" aria-label="Available capabilities">
-        <article><span>01</span><h2>Cinema onboarding</h2><p>Register a cinema and follow its review status.</p></article>
-        <article><span>02</span><h2>Team access</h2><p>Invite staff and manage permission-aware access.</p></article>
-        <article><span>03</span><h2>Catalog operations</h2><p>Configure movies, screens, pricing, and showtimes.</p></article>
+        <article><span>01</span><h2>Cinema onboarding</h2><p>Set up your cinema, screens, locations and operational preferences.</p></article>
+        <article><span>02</span><h2>Staff &amp; permissions</h2><p>Manage your team and control access with roles and permissions.</p></article>
+        <article><span>03</span><h2>Movies, screens &amp; showtimes</h2><p>Organize your content, screens and showtimes in one central workspace.</p></article>
       </section>
     </main>
   );
