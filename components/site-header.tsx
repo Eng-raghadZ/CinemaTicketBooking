@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { getCurrentUserContext } from "@/lib/auth/server";
-import { SignOutButton } from "@/app/(auth)/sign-out-button";
 import { HeaderFrame } from "@/components/header-frame";
+import { SiteNavigation } from "@/components/site-navigation";
 
 export async function SiteHeader() {
   const user = await getCurrentUserContext();
@@ -14,17 +14,7 @@ export async function SiteHeader() {
         </svg>
         <span className="site-brand-copy">Moviera<small>CINEMA PLATFORM</small></span>
       </Link>
-      <nav className="site-nav" aria-label="Primary navigation">
-        <Link href="/">Home</Link>
-        {user ? (
-          <>
-            <Link href="/dashboard">Dashboard</Link>
-            <SignOutButton className="nav-auth-action" />
-          </>
-        ) : (
-          <Link className="nav-auth-action" href="/login">Sign In</Link>
-        )}
-      </nav>
+      <SiteNavigation isAuthenticated={Boolean(user)} />
     </HeaderFrame>
   );
 }
