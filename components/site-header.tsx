@@ -15,7 +15,7 @@ export async function SiteHeader() {
       <nav className="site-nav" aria-label="Primary navigation">
         <Link href="/">Home</Link>
         {user ? (
-          <Link className="nav-cta" href="/dashboard">Dashboard</Link>
+          <Link href="/dashboard">Dashboard</Link>
         ) : (
           <Link className="nav-cta" href="/login">Sign In</Link>
         )}
