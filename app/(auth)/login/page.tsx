@@ -14,18 +14,16 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   const redirectTo = safeInternalRedirectPath(requestedPath);
 
   return (
-    <main className="auth-page">
-      <section className="auth-story">
-        <p className="eyebrow">MOVIERA ACCESS</p>
-        <h1>Your cinema. Your team. One control room.</h1>
-        <p>Return to the management workspace for your cinemas, staff, screens, movies, and showtimes.</p>
+    <main className="auth-page login-page">
+      <section className="auth-story login-story">
+        <p className="eyebrow">CINEMA OPERATIONS</p>
+        <h1>Welcome back</h1>
       </section>
-      <section className="auth-panel">
-        <p className="eyebrow">WELCOME BACK</p>
+      <section className="auth-panel login-panel">
         <h2>Sign in</h2>
-        <p>Use your account credentials to continue.</p>
+        <p>Access your cinema management workspace.</p>
         <LoginForm redirectTo={redirectTo} />
-        <p className="auth-switch">Don&apos;t have an account? <Link href="/signup">Create one</Link></p>
+        <p className="auth-switch">New to Moviera? <Link href="/signup">Create an account</Link></p>
       </section>
     </main>
   );
