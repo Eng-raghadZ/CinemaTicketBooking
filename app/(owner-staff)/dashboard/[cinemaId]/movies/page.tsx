@@ -1,10 +1,11 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireCinemaStaffOrRedirect } from "@/lib/auth/guards";
 import { hasMinCinemaStaffRole } from "@/lib/auth/permissions";
 import { createServerSupabaseClient } from "@/lib/auth/server";
-import { SignOutButton } from "@/app/(auth)/sign-out-button";
 import { AddMovieForm } from "./add-movie-form";
 import { RemoveMovieButton } from "./remove-movie-button";
+import ui from "@/app/ui.module.css";
 
 interface CatalogMovieRow {
   id: string;
@@ -56,41 +57,57 @@ export default async function CinemaMoviesPage({
   const availableToAdd = catalog.filter((movie) => !selectedIds.has(movie.id));
 
   return (
-    <main>
-      <h1>Movies</h1>
-      <p>Select which titles from the platform catalog this cinema shows.</p>
-      <SignOutButton />
+    <main className={ui.container}>
+      <Link href={`/dashboard/${cinemaId}`} className={ui.backLink}>
+        ← Back to cinema
+      </Link>
+      <div className={ui.pageHeader}>
+        <h1 className={ui.pageTitle}>Movies</h1>
+        <p className={ui.pageSubtitle}>
+          Select which titles from the platform catalog this cinema shows.
+        </p>
+      </div>
 
-      <section>
-        <h2>Currently showing ({cinemaMovies.length})</h2>
+      <section className={ui.section}>
+        <div className={ui.sectionHeader}>
+          <h2 className={ui.sectionTitle}>Currently showing ({cinemaMovies.length})</h2>
+        </div>
         {cinemaMovies.length === 0 ? (
-          <p>No movies selected yet.</p>
+          <p className={ui.emptyState}>No movies selected yet.</p>
         ) : (
-          <ul>
+          <div className={ui.grid}>
             {cinemaMovies.map((cm) => (
-              <li key={cm.movie_id}>
-                {cm.movies?.title ?? "Unknown title"} — {cm.movies?.duration_minutes ?? "?"} min
-                {cm.movies?.rating ? ` — ${cm.movies.rating}` : ""}
+              <div key={cm.movie_id} className={ui.card}>
+                <p style={{ margin: "0 0 6px", fontSize: 14 }}>{cm.movies?.title ?? "Unknown title"}</p>
+                <p style={{ margin: "0 0 12px", color: "var(--color-text-muted)", fontSize: 12 }}>
+                  {cm.movies?.duration_minutes ?? "?"} min
+                  {cm.movies?.rating ? ` · ${cm.movies.rating}` : ""}
+                </p>
                 {canManage && <RemoveMovieButton cinemaId={cinemaId} movieId={cm.movie_id} />}
-              </li>
+              </div>
             ))}
-          </ul>
+          </div>
         )}
       </section>
 
-      {canManage && (
-        <section>
-          <h2>Add from catalog</h2>
-          {availableToAdd.length === 0 ? (
-            <p>Every catalog title has already been added.</p>
-          ) : (
-            <AddMovieForm cinemaId={cinemaId} movies={availableToAdd} />
-          )}
-        </section>
-      )}
-      {!canManage && (
-        <p>Only the cinema owner or a manager can add or remove movies for this cinema.</p>
-      )}
+      <section className={ui.section}>
+        {canManage ? (
+          <>
+            <div className={ui.sectionHeader}>
+              <h2 className={ui.sectionTitle}>Add from catalog</h2>
+            </div>
+            {availableToAdd.length === 0 ? (
+              <p className={ui.emptyState}>Every catalog title has already been added.</p>
+            ) : (
+              <AddMovieForm cinemaId={cinemaId} movies={availableToAdd} />
+            )}
+          </>
+        ) : (
+          <p style={{ color: "var(--color-text-muted)", fontSize: 13 }}>
+            Only the cinema owner or a manager can add or remove movies for this cinema.
+          </p>
+        )}
+      </section>
     </main>
   );
 }

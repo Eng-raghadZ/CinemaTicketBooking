@@ -1,8 +1,10 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requirePlatformAdminOrRedirect } from "@/lib/auth/guards";
 import { createServerSupabaseClient } from "@/lib/auth/server";
 import { CinemaReviewActions } from "./review-actions";
-import { SignOutButton } from "@/app/(auth)/sign-out-button";
+import { StatusBadge } from "@/app/status-badge";
+import ui from "@/app/ui.module.css";
 
 interface CinemaDetail {
   id: string;
@@ -37,32 +39,40 @@ export default async function AdminCinemaDetailPage({
   if (!data) notFound();
   const cinema = data as CinemaDetail;
 
+  const details: [string, React.ReactNode][] = [
+    ["Country / Currency", `${cinema.country_code} / ${cinema.currency_code}`],
+    ["Location", cinema.location ?? "—"],
+    ["Description", cinema.description ?? "—"],
+    ["Submitted", new Date(cinema.created_at).toLocaleString()],
+  ];
+  if (cinema.rejection_reason) {
+    details.push(["Rejection reason", cinema.rejection_reason]);
+  }
+
   return (
-    <main>
-      <h1>{cinema.name}</h1>
-      <dl>
-        <dt>Status</dt>
-        <dd>{cinema.status}</dd>
-        <dt>Country / Currency</dt>
-        <dd>
-          {cinema.country_code} / {cinema.currency_code}
-        </dd>
-        <dt>Location</dt>
-        <dd>{cinema.location ?? "—"}</dd>
-        <dt>Description</dt>
-        <dd>{cinema.description ?? "—"}</dd>
-        <dt>Submitted</dt>
-        <dd>{new Date(cinema.created_at).toLocaleString()}</dd>
-        {cinema.rejection_reason && (
-          <>
-            <dt>Rejection reason</dt>
-            <dd>{cinema.rejection_reason}</dd>
-          </>
-        )}
+    <main className={ui.container} style={{ maxWidth: 640 }}>
+      <Link href="/dashboard/cinemas" className={ui.backLink}>
+        ← Back to review queue
+      </Link>
+      <div className={ui.pageHeader}>
+        <h1 className={ui.pageTitle}>{cinema.name}</h1>
+        <p style={{ margin: "10px 0 0" }}>
+          <StatusBadge status={cinema.status} />
+        </p>
+      </div>
+
+      <dl className={ui.card} style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "10px 20px", fontSize: 13 }}>
+        {details.map(([label, value]) => (
+          <div key={label} style={{ display: "contents" }}>
+            <dt style={{ color: "var(--color-text-muted)" }}>{label}</dt>
+            <dd style={{ margin: 0 }}>{value}</dd>
+          </div>
+        ))}
       </dl>
 
-      <CinemaReviewActions cinemaId={cinema.id} status={cinema.status} />
-      <SignOutButton />
+      <div className={ui.section} style={{ marginTop: 28 }}>
+        <CinemaReviewActions cinemaId={cinema.id} status={cinema.status} />
+      </div>
     </main>
   );
 }

@@ -4,13 +4,14 @@ import { useFormStatus } from "react-dom";
 import { useActionState, useEffect, useRef } from "react";
 import { createShowtime } from "@/lib/actions/showtimes";
 import type { ActionResult } from "@/lib/actions/cinemas";
+import ui from "@/app/ui.module.css";
 
 const initialState: ActionResult<{ showtimeId: string }> = { ok: false, error: "" };
 
 function SubmitButton() {
   const { pending } = useFormStatus();
   return (
-    <button type="submit" disabled={pending}>
+    <button type="submit" disabled={pending} className={ui.buttonPrimary}>
       {pending ? "Scheduling..." : "Schedule showtime"}
     </button>
   );
@@ -46,12 +47,12 @@ export function ShowtimeForm({
   }, [state]);
 
   return (
-    <form action={formAction} ref={formRef}>
+    <form action={formAction} ref={formRef} className={ui.card} style={{ maxWidth: 420 }} noValidate>
       <input type="hidden" name="cinemaId" value={cinemaId} />
 
-      <label>
-        Movie
-        <select name="movieId" required defaultValue="">
+      <label className={ui.field}>
+        <span className={ui.fieldLabel}>Movie</span>
+        <select className={ui.select} name="movieId" required defaultValue="">
           <option value="" disabled>
             Select a movie
           </option>
@@ -63,12 +64,14 @@ export function ShowtimeForm({
         </select>
       </label>
       {!state.ok && state.fieldErrors?.movieId && (
-        <p role="alert">{state.fieldErrors.movieId[0]}</p>
+        <p role="alert" className={ui.alertError}>
+          {state.fieldErrors.movieId[0]}
+        </p>
       )}
 
-      <label>
-        Screen
-        <select name="screenId" required defaultValue="">
+      <label className={ui.field}>
+        <span className={ui.fieldLabel}>Screen</span>
+        <select className={ui.select} name="screenId" required defaultValue="">
           <option value="" disabled>
             Select a screen
           </option>
@@ -80,27 +83,41 @@ export function ShowtimeForm({
         </select>
       </label>
       {!state.ok && state.fieldErrors?.screenId && (
-        <p role="alert">{state.fieldErrors.screenId[0]}</p>
+        <p role="alert" className={ui.alertError}>
+          {state.fieldErrors.screenId[0]}
+        </p>
       )}
 
-      <label>
-        Starts at
-        <input name="startsAt" type="datetime-local" required />
+      <label className={ui.field}>
+        <span className={ui.fieldLabel}>Starts at</span>
+        <input className={ui.input} name="startsAt" type="datetime-local" required />
       </label>
       {!state.ok && state.fieldErrors?.startsAt && (
-        <p role="alert">{state.fieldErrors.startsAt[0]}</p>
+        <p role="alert" className={ui.alertError}>
+          {state.fieldErrors.startsAt[0]}
+        </p>
       )}
 
-      <label>
-        Base price
-        <input name="basePrice" type="number" required min={0} step="0.01" />
+      <label className={ui.field}>
+        <span className={ui.fieldLabel}>Base price</span>
+        <input className={ui.input} name="basePrice" type="number" required min={0} step="0.01" />
       </label>
       {!state.ok && state.fieldErrors?.basePrice && (
-        <p role="alert">{state.fieldErrors.basePrice[0]}</p>
+        <p role="alert" className={ui.alertError}>
+          {state.fieldErrors.basePrice[0]}
+        </p>
       )}
 
-      {!state.ok && state.error && <p role="alert">{state.error}</p>}
-      {state.ok && <p role="status">Showtime scheduled.</p>}
+      {!state.ok && state.error && (
+        <p role="alert" className={ui.alertError}>
+          {state.error}
+        </p>
+      )}
+      {state.ok && (
+        <p role="status" className={ui.alertSuccess}>
+          Showtime scheduled.
+        </p>
+      )}
 
       <SubmitButton />
     </form>

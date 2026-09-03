@@ -3,8 +3,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserSupabaseClient } from "@/lib/auth/client";
+import styles from "@/app/ui.module.css";
 
-export function SignOutButton() {
+export function SignOutButton({ className }: { className?: string }) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
 
@@ -19,7 +20,12 @@ export function SignOutButton() {
   }
 
   return (
-    <button type="button" onClick={handleSignOut} disabled={pending}>
+    <button
+      type="button"
+      onClick={handleSignOut}
+      disabled={pending}
+      className={className ?? styles.buttonGhost}
+    >
       {pending ? "Signing out..." : "Sign out"}
     </button>
   );

@@ -2,7 +2,8 @@ import Link from "next/link";
 import { requireAuthenticatedUser } from "@/lib/auth/guards";
 import { createServerSupabaseClient } from "@/lib/auth/server";
 import { AcceptInviteButton } from "./accept-invite-button";
-import { SignOutButton } from "@/app/(auth)/sign-out-button";
+import { StatusBadge } from "@/app/status-badge";
+import ui from "@/app/ui.module.css";
 
 interface MembershipRow {
   id: string;
@@ -26,47 +27,65 @@ export default async function DashboardHomePage() {
   const invited = memberships.filter((m) => m.status === "invited");
 
   return (
-    <main>
-      <h1>Your dashboard</h1>
+    <main className={ui.container}>
+      <div className={ui.pageHeader}>
+        <h1 className={ui.pageTitle}>Your dashboard</h1>
+        <p className={ui.pageSubtitle}>Cinemas you own or work at, and any pending invitations.</p>
+      </div>
 
       {invited.length > 0 && (
-        <section>
-          <h2>Pending invites</h2>
-          <ul>
+        <section className={ui.section}>
+          <div className={ui.sectionHeader}>
+            <h2 className={ui.sectionTitle}>Pending invites</h2>
+          </div>
+          <div className={ui.grid}>
             {invited.map((m) => (
-              <li key={m.id}>
-                {m.cinemas?.name ?? "Unknown cinema"} — invited as {m.role}
+              <div key={m.id} className={ui.card}>
+                <p style={{ margin: "0 0 4px", fontSize: 14 }}>{m.cinemas?.name ?? "Unknown cinema"}</p>
+                <p style={{ margin: "0 0 12px", color: "var(--color-text-muted)", fontSize: 13 }}>
+                  Invited as {m.role}
+                </p>
                 <AcceptInviteButton staffId={m.id} />
-              </li>
+              </div>
             ))}
-          </ul>
+          </div>
         </section>
       )}
 
-      <section>
-        <h2>Your cinemas</h2>
+      <section className={ui.section}>
+        <div className={ui.sectionHeader}>
+          <h2 className={ui.sectionTitle}>Your cinemas</h2>
+          <Link href="/dashboard/register" className={ui.buttonGhost}>
+            Register a new cinema
+          </Link>
+        </div>
+
         {active.length === 0 ? (
-          <p>
+          <p className={ui.emptyState}>
             You don&apos;t manage any cinemas yet.{" "}
-            <Link href="/dashboard/register">Register one</Link>.
+            <Link href="/dashboard/register" className={ui.link}>
+              Register one
+            </Link>
+            .
           </p>
         ) : (
-          <ul>
+          <div className={ui.grid}>
             {active.map((m) => (
-              <li key={m.id}>
-                <Link href={`/dashboard/${m.cinemas?.id}`}>
-                  {m.cinemas?.name}
-                </Link>{" "}
-                — {m.role} — {m.cinemas?.status}
-              </li>
+              <Link
+                key={m.id}
+                href={`/dashboard/${m.cinemas?.id}`}
+                className={`${ui.card} ${ui.cardLink}`}
+              >
+                <p style={{ margin: "0 0 8px", fontSize: 15 }}>{m.cinemas?.name}</p>
+                <p style={{ margin: "0 0 10px", color: "var(--color-text-muted)", fontSize: 13, textTransform: "capitalize" }}>
+                  {m.role}
+                </p>
+                {m.cinemas?.status && <StatusBadge status={m.cinemas.status} />}
+              </Link>
             ))}
-          </ul>
+          </div>
         )}
-        <p>
-          <Link href="/dashboard/register">Register a new cinema</Link>
-        </p>
       </section>
-      <SignOutButton />
     </main>
   );
 }

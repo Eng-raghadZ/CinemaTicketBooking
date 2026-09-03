@@ -3,6 +3,7 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserSupabaseClient } from "@/lib/auth/client";
+import ui from "@/app/ui.module.css";
 
 export function SignupForm() {
   const router = useRouter();
@@ -55,10 +56,11 @@ export function SignupForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit}>
-      <label>
-        Full name
+    <form onSubmit={handleSubmit} noValidate>
+      <label className={ui.field}>
+        <span className={ui.fieldLabel}>Full name</span>
         <input
+          className={ui.input}
           name="fullName"
           autoComplete="name"
           required
@@ -68,9 +70,10 @@ export function SignupForm() {
         />
       </label>
 
-      <label>
-        Email
+      <label className={ui.field}>
+        <span className={ui.fieldLabel}>Email</span>
         <input
+          className={ui.input}
           type="email"
           name="email"
           autoComplete="email"
@@ -80,9 +83,10 @@ export function SignupForm() {
         />
       </label>
 
-      <label>
-        Password
+      <label className={ui.field}>
+        <span className={ui.fieldLabel}>Password</span>
         <input
+          className={ui.input}
           type="password"
           name="password"
           autoComplete="new-password"
@@ -93,9 +97,10 @@ export function SignupForm() {
         />
       </label>
 
-      <label>
-        Confirm password
+      <label className={ui.field}>
+        <span className={ui.fieldLabel}>Confirm password</span>
         <input
+          className={ui.input}
           type="password"
           name="confirmPassword"
           autoComplete="new-password"
@@ -106,10 +111,18 @@ export function SignupForm() {
         />
       </label>
 
-      {errorMessage && <p role="alert">{errorMessage}</p>}
-      {message && <p role="status">{message}</p>}
+      {errorMessage && (
+        <p role="alert" className={ui.alertError}>
+          {errorMessage}
+        </p>
+      )}
+      {message && (
+        <p role="status" className={ui.alertSuccess}>
+          {message}
+        </p>
+      )}
 
-      <button type="submit" disabled={pending}>
+      <button type="submit" className={ui.buttonPrimary} disabled={pending} style={{ width: "100%", marginTop: 4 }}>
         {pending ? "Creating account..." : "Create account"}
       </button>
     </form>

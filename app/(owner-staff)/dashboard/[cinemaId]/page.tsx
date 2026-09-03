@@ -3,7 +3,8 @@ import { notFound } from "next/navigation";
 import { requireCinemaStaffOrRedirect } from "@/lib/auth/guards";
 import { cinemaDashboardNavLabels, type CinemaStaffMembership } from "@/lib/auth/permissions";
 import { createServerSupabaseClient } from "@/lib/auth/server";
-import { SignOutButton } from "@/app/(auth)/sign-out-button";
+import { StatusBadge } from "@/app/status-badge";
+import ui from "@/app/ui.module.css";
 
 type CinemaDashboardPageProps = {
   params: Promise<{ cinemaId: string }>;
@@ -48,44 +49,49 @@ export default async function CinemaDashboardPage({
   // can only view.
   const navLabels = cinemaDashboardNavLabels(membership as CinemaStaffMembership | null);
 
-  return (
-    <main>
-      <h1>{cinema.name}</h1>
+  const navItems = [
+    { href: `/dashboard/${cinema.id}/staff`, label: navLabels.staff },
+    { href: `/dashboard/${cinema.id}/movies`, label: navLabels.movies },
+    { href: `/dashboard/${cinema.id}/screens`, label: navLabels.screens },
+    { href: `/dashboard/${cinema.id}/showtimes`, label: navLabels.showtimes },
+  ];
 
-      <p>
-        Review status: <strong>{cinema.status}</strong>
-      </p>
+  return (
+    <main className={ui.container}>
+      <Link href="/dashboard" className={ui.backLink}>
+        ← Back to your cinemas
+      </Link>
+
+      <div className={ui.pageHeader}>
+        <h1 className={ui.pageTitle}>{cinema.name}</h1>
+        <p style={{ margin: "10px 0 0" }}>
+          <StatusBadge status={cinema.status} />
+        </p>
+      </div>
 
       {cinema.status === "pending_review" && (
-        <p>Your cinema is waiting for platform administrator review.</p>
+        <p className={ui.emptyState}>Your cinema is waiting for platform administrator review.</p>
       )}
 
       {cinema.status === "rejected" && cinema.rejection_reason && (
-        <p role="alert">Rejection reason: {cinema.rejection_reason}</p>
-      )}
-
-      {cinema.status === "approved" && (
-        <p>Your cinema has been approved.</p>
+        <p role="alert" className={ui.alertError}>
+          Rejection reason: {cinema.rejection_reason}
+        </p>
       )}
 
       {cinema.status === "suspended" && (
-        <p role="alert">This cinema is currently suspended.</p>
+        <p role="alert" className={ui.alertError}>
+          This cinema is currently suspended.
+        </p>
       )}
 
-      <nav aria-label="Cinema management">
-        <Link href={`/dashboard/${cinema.id}/staff`}>{navLabels.staff}</Link>
-        {" | "}
-        <Link href={`/dashboard/${cinema.id}/movies`}>{navLabels.movies}</Link>
-        {" | "}
-        <Link href={`/dashboard/${cinema.id}/screens`}>{navLabels.screens}</Link>
-        {" | "}
-        <Link href={`/dashboard/${cinema.id}/showtimes`}>{navLabels.showtimes}</Link>
+      <nav aria-label="Cinema management" className={ui.grid} style={{ marginTop: 28 }}>
+        {navItems.map((item) => (
+          <Link key={item.href} href={item.href} className={`${ui.card} ${ui.cardLink}`}>
+            <span style={{ textTransform: "capitalize", fontSize: 14 }}>{item.label}</span>
+          </Link>
+        ))}
       </nav>
-
-      <p>
-        <Link href="/dashboard">Back to your cinemas</Link>
-      </p>
-      <SignOutButton />
     </main>
   );
 }

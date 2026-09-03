@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireCinemaStaffOrRedirect } from "@/lib/auth/guards";
 import {
@@ -7,7 +8,8 @@ import {
 import { createServerSupabaseClient } from "@/lib/auth/server";
 import { InviteStaffForm } from "./invite-form";
 import { RevokeStaffButton } from "./revoke-button";
-import { SignOutButton } from "@/app/(auth)/sign-out-button";
+import { StatusBadge } from "@/app/status-badge";
+import ui from "@/app/ui.module.css";
 
 interface StaffRow {
   id: string;
@@ -56,50 +58,65 @@ export default async function CinemaStaffPage({
   );
 
   return (
-    <main>
-      <h1>Staff</h1>
-      <table>
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Email</th>
-            <th>Role</th>
-            <th>Status</th>
-            {canManage && <th aria-label="actions" />}
-          </tr>
-        </thead>
-        <tbody>
-          {staff.map((row) => (
-            <tr key={row.id}>
-              <td>{row.users?.full_name ?? "—"}</td>
-              <td>{row.users?.email ?? "—"}</td>
-              <td>{row.role}</td>
-              <td>{row.status}</td>
-              {canManage && (
-                <td>
-                  {row.role !== "owner" && row.status !== "revoked" && (
-                    <RevokeStaffButton
-                      cinemaId={cinemaId}
-                      staffId={row.id}
-                      isSelf={row.user_id === userId}
-                    />
-                  )}
-                </td>
-              )}
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <main className={ui.container}>
+      <Link href={`/dashboard/${cinemaId}`} className={ui.backLink}>
+        ← Back to cinema
+      </Link>
+      <div className={ui.pageHeader}>
+        <h1 className={ui.pageTitle}>Staff</h1>
+      </div>
 
-      {canManage && <InviteStaffForm cinemaId={cinemaId} />}
-      {!canManage && (
-        <p>
-          Only the cinema owner, or a manager granted the &quot;manage
-          staff&quot; permission, can invite or revoke staff.
-        </p>
+      {staff.length === 0 ? (
+        <p className={ui.emptyState}>No staff members yet.</p>
+      ) : (
+        <div className={ui.tableWrap}>
+          <table className={ui.table}>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Role</th>
+                <th>Status</th>
+                {canManage && <th aria-label="actions" />}
+              </tr>
+            </thead>
+            <tbody>
+              {staff.map((row) => (
+                <tr key={row.id}>
+                  <td>{row.users?.full_name ?? "—"}</td>
+                  <td>{row.users?.email ?? "—"}</td>
+                  <td style={{ textTransform: "capitalize" }}>{row.role}</td>
+                  <td>
+                    <StatusBadge status={row.status} />
+                  </td>
+                  {canManage && (
+                    <td>
+                      {row.role !== "owner" && row.status !== "revoked" && (
+                        <RevokeStaffButton
+                          cinemaId={cinemaId}
+                          staffId={row.id}
+                          isSelf={row.user_id === userId}
+                        />
+                      )}
+                    </td>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
 
-      <SignOutButton />
+      <div className={ui.section} style={{ marginTop: 32 }}>
+        {canManage ? (
+          <InviteStaffForm cinemaId={cinemaId} />
+        ) : (
+          <p style={{ color: "var(--color-text-muted)", fontSize: 13 }}>
+            Only the cinema owner, or a manager granted the &quot;manage
+            staff&quot; permission, can invite or revoke staff.
+          </p>
+        )}
+      </div>
     </main>
   );
 }

@@ -4,13 +4,14 @@ import { useFormStatus } from "react-dom";
 import { useActionState } from "react";
 import { removeCinemaMovie } from "@/lib/actions/cinema-movies";
 import type { ActionResult } from "@/lib/actions/cinemas";
+import ui from "@/app/ui.module.css";
 
 const initialState: ActionResult = { ok: false, error: "" };
 
 function SubmitButton() {
   const { pending } = useFormStatus();
   return (
-    <button type="submit" disabled={pending}>
+    <button type="submit" disabled={pending} className={`${ui.buttonDanger} ${ui.buttonSmall}`}>
       {pending ? "Removing..." : "Remove"}
     </button>
   );
@@ -23,7 +24,11 @@ export function RemoveMovieButton({ cinemaId, movieId }: { cinemaId: string; mov
       <input type="hidden" name="cinemaId" value={cinemaId} />
       <input type="hidden" name="movieId" value={movieId} />
       <SubmitButton />
-      {!state.ok && state.error && <p role="alert">{state.error}</p>}
+      {!state.ok && state.error && (
+        <p role="alert" className={ui.alertError} style={{ marginTop: 6 }}>
+          {state.error}
+        </p>
+      )}
     </form>
   );
 }

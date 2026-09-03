@@ -1,0 +1,79 @@
+:root {
+  --color-bg: #0c0c0c;
+  --color-surface: #141010;
+  --color-panel: #1a1414;
+  --color-border: #322424;
+  --color-border-strong: #6e1e1e;
+  --color-accent: #8f1f1f;
+  --color-accent-hover: #a52626;
+  --color-accent-bright: #c7342f;
+  --color-text: #f2ede4;
+  --color-text-muted: #a89d92;
+  --color-success: #4f9d6e;
+  --color-danger: #d9534f;
+  --radius: 2px;
+  --font-display: Georgia, "Times New Roman", serif;
+  --font-body: -apple-system, "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --max-width: 1080px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  font-weight: 500;
+  margin: 0;
+}
+
+a {
+  color: inherit;
+}
+
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+/* One visible, consistent focus ring for every interactive element,
+   project-wide — required for keyboard accessibility. */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--color-accent-bright);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: var(--color-accent);
+  color: var(--color-text);
+}

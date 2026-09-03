@@ -3,6 +3,7 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserSupabaseClient } from "@/lib/auth/client";
+import ui from "@/app/ui.module.css";
 
 type LoginFormProps = {
   redirectTo: string;
@@ -37,10 +38,11 @@ export function LoginForm({ redirectTo }: LoginFormProps) {
   }
 
   return (
-    <form onSubmit={handleSubmit}>
-      <label>
-        Email
+    <form onSubmit={handleSubmit} noValidate>
+      <label className={ui.field}>
+        <span className={ui.fieldLabel}>Email</span>
         <input
+          className={ui.input}
           type="email"
           name="email"
           autoComplete="email"
@@ -50,9 +52,10 @@ export function LoginForm({ redirectTo }: LoginFormProps) {
         />
       </label>
 
-      <label>
-        Password
+      <label className={ui.field}>
+        <span className={ui.fieldLabel}>Password</span>
         <input
+          className={ui.input}
           type="password"
           name="password"
           autoComplete="current-password"
@@ -63,9 +66,13 @@ export function LoginForm({ redirectTo }: LoginFormProps) {
         />
       </label>
 
-      {errorMessage && <p role="alert">{errorMessage}</p>}
+      {errorMessage && (
+        <p role="alert" className={ui.alertError}>
+          {errorMessage}
+        </p>
+      )}
 
-      <button type="submit" disabled={pending}>
+      <button type="submit" className={ui.buttonPrimary} disabled={pending} style={{ width: "100%" }}>
         {pending ? "Signing in..." : "Sign in"}
       </button>
     </form>
