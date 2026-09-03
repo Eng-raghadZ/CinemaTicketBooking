@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireAuthenticatedUser } from "@/lib/auth/guards";
 import { createServerSupabaseClient } from "@/lib/auth/server";
 import { AcceptInviteButton } from "./accept-invite-button";
+import { BackLink } from "@/components/back-link";
 
 interface MembershipRow {
   id: string;
@@ -38,6 +39,7 @@ export default async function DashboardHomePage() {
     <main className="owner-dashboard">
       <section className="dashboard-hero">
         <div className="dashboard-hero-content">
+          <BackLink href="/" label="Home" />
           <p className="eyebrow">OWNER WORKSPACE</p>
           <h1>Your cinemas</h1>
           <p>Manage your cinema locations and operational access.</p>

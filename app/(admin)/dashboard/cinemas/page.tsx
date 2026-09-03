@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { requirePlatformAdmin } from "@/lib/auth/guards";
 import { createServerSupabaseClient } from "@/lib/auth/server";
+import { BackLink } from "@/components/back-link";
 
 const STATUS_TABS = [
   "pending_review",
@@ -45,6 +46,7 @@ export default async function AdminCinemasPage({
 
   return (
     <main>
+      <BackLink href="/dashboard" label="Dashboard" />
       <h1>Cinema review queue</h1>
       <nav aria-label="Admin sections">
         <Link href="/dashboard/movies">Movie catalog</Link>

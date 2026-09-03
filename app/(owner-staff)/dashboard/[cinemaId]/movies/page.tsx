@@ -4,6 +4,7 @@ import { hasMinCinemaStaffRole } from "@/lib/auth/permissions";
 import { createServerSupabaseClient } from "@/lib/auth/server";
 import { AddMovieForm } from "./add-movie-form";
 import { RemoveMovieButton } from "./remove-movie-button";
+import { BackLink } from "@/components/back-link";
 
 interface CatalogMovieRow {
   id: string;
@@ -56,6 +57,7 @@ export default async function CinemaMoviesPage({
 
   return (
     <main>
+      <BackLink href={`/dashboard/${cinemaId}`} label="Cinema dashboard" />
       <h1>Movies</h1>
       <p>Select which titles from the platform catalog this cinema shows.</p>
 

@@ -4,6 +4,7 @@ import { hasCinemaPermission, type CinemaStaffMembership } from "@/lib/auth/perm
 import { createServerSupabaseClient } from "@/lib/auth/server";
 import { ShowtimeForm } from "./showtime-form";
 import { ShowtimeRowActions } from "./showtime-row-actions";
+import { BackLink } from "@/components/back-link";
 
 interface ShowtimeRow {
   id: string;
@@ -76,6 +77,7 @@ export default async function CinemaShowtimesPage({
 
   return (
     <main>
+      <BackLink href={`/dashboard/${cinemaId}`} label="Cinema dashboard" />
       <h1>Showtimes</h1>
 
       <section>

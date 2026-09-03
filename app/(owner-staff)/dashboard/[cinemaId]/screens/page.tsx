@@ -3,6 +3,7 @@ import { requireCinemaStaffOrRedirect } from "@/lib/auth/guards";
 import { hasCinemaPermission, type CinemaStaffMembership } from "@/lib/auth/permissions";
 import { createServerSupabaseClient } from "@/lib/auth/server";
 import { ScreenForm } from "./screen-form";
+import { BackLink } from "@/components/back-link";
 
 interface ScreenRow {
   id: string;
@@ -44,6 +45,7 @@ export default async function CinemaScreensPage({
 
   return (
     <main>
+      <BackLink href={`/dashboard/${cinemaId}`} label="Cinema dashboard" />
       <h1>Screens</h1>
 
       <section>

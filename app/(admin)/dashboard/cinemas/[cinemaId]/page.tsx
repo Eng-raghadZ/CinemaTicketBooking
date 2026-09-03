@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { requirePlatformAdminOrRedirect } from "@/lib/auth/guards";
 import { createServerSupabaseClient } from "@/lib/auth/server";
 import { CinemaReviewActions } from "./review-actions";
+import { BackLink } from "@/components/back-link";
 
 interface CinemaDetail {
   id: string;
@@ -38,6 +39,7 @@ export default async function AdminCinemaDetailPage({
 
   return (
     <main>
+      <BackLink href="/dashboard/cinemas" label="Cinema reviews" />
       <h1>{cinema.name}</h1>
       <dl>
         <dt>Status</dt>

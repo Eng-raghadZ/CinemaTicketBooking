@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { BackLink } from "@/components/back-link";
 
 /**
  * Friendly landing page for an expected authorization failure — e.g. a
@@ -17,6 +18,7 @@ import Link from "next/link";
 export default function AccessDeniedPage() {
   return (
     <main>
+      <BackLink href="/dashboard" label="Dashboard" />
       <h1>Access denied</h1>
       <p>
         You don&apos;t have access to that cinema, or your access has

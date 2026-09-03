@@ -1,5 +1,6 @@
 import { requireAuthenticatedUser } from "@/lib/auth/guards";
 import { RegisterCinemaForm } from "./register-form";
+import { BackLink } from "@/components/back-link";
 
 export default async function RegisterCinemaPage() {
   // Defense in depth: middleware already blocks unauthenticated requests to
@@ -9,6 +10,7 @@ export default async function RegisterCinemaPage() {
 
   return (
     <main>
+      <BackLink href="/dashboard" label="Dashboard" />
       <h1>Register a new cinema</h1>
       <p>
         Your cinema stays private until a platform administrator approves it.

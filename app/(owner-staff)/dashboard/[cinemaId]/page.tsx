@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { requireCinemaStaffOrRedirect } from "@/lib/auth/guards";
 import { cinemaDashboardNavLabels, type CinemaStaffMembership } from "@/lib/auth/permissions";
 import { createServerSupabaseClient } from "@/lib/auth/server";
+import { BackLink } from "@/components/back-link";
 
 type CinemaDashboardPageProps = {
   params: Promise<{ cinemaId: string }>;
@@ -49,6 +50,7 @@ export default async function CinemaDashboardPage({
 
   return (
     <main>
+      <BackLink href="/dashboard" label="Dashboard" />
       <h1>{cinema.name}</h1>
 
       <p>
@@ -80,10 +82,6 @@ export default async function CinemaDashboardPage({
         {" | "}
         <Link href={`/dashboard/${cinema.id}/showtimes`}>{navLabels.showtimes}</Link>
       </nav>
-
-      <p>
-        <Link href="/dashboard">Back to your cinemas</Link>
-      </p>
     </main>
   );
 }

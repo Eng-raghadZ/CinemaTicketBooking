@@ -16,6 +16,10 @@ button,input,textarea,select{font:inherit}
 .site-nav a:hover::after,.site-nav a.active::after,.site-nav button:hover::after{right:0}
 .site-nav .nav-auth-action{min-height:0;padding:0;border:0;background:transparent;color:var(--redHover);line-height:inherit}
 .site-nav .nav-auth-action::after{background:#fff}
+.back-link{display:inline-flex;align-items:center;gap:8px;width:fit-content;margin:0 0 24px;color:var(--muted);font-family:var(--font-display),Impact,sans-serif;font-size:.95rem;letter-spacing:.07em;text-decoration:none;text-transform:uppercase;transition:color .18s ease}
+.back-link svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:square;stroke-linejoin:miter;transition:transform .18s ease}
+.back-link:hover{color:#fff}.back-link:hover svg{transform:translateX(-3px)}
+.back-link:focus-visible{outline:2px solid var(--redHover);outline-offset:5px}
 main:not(.home-main):not(.auth-page){width:min(var(--max),calc(100% - 48px));min-height:68vh;margin:0 auto;padding:136px 0 90px}
 main:not(.home-main):not(.auth-page)>h1{margin:0 0 14px;font-family:var(--font-display),Impact,sans-serif;font-size:clamp(2.15rem,4.4vw,3.85rem);font-weight:400;line-height:1;letter-spacing:.02em;text-transform:uppercase}
 main:not(.home-main):not(.auth-page)>h1::after{content:"";display:block;width:78px;height:3px;margin-top:20px;background:var(--red)}
@@ -91,6 +95,7 @@ body:has(.login-page) .site-footer{display:none}
 .owner-dashboard{width:100%!important;max-width:none;min-height:100vh!important;padding:0 0 84px!important}
 .dashboard-hero{display:flex;align-items:flex-end;justify-content:space-between;min-height:390px;padding:150px max(7vw,calc((100vw - 1440px)/2)) 40px;border-bottom:1px solid var(--line);background:linear-gradient(90deg,rgba(4,5,6,.94),rgba(4,5,6,.52) 55%,rgba(4,5,6,.74)),linear-gradient(180deg,rgba(4,5,6,.2),rgba(4,5,6,.84)),url('/images/moviera-auditorium.png');background-size:cover;background-position:center 52%}
 .dashboard-hero-content h1{margin:0;font-family:var(--font-display),Impact,sans-serif;font-size:clamp(3.7rem,6vw,6rem);font-weight:400;line-height:.9;letter-spacing:.025em;text-transform:uppercase}
+.dashboard-hero-content .back-link{margin-bottom:20px;color:#c5c6c9}
 .dashboard-hero-content>p:last-child{margin:16px 0 0;color:#b5b7bc;font-size:1.05rem}
 .dashboard-register{min-width:270px;min-height:56px;margin-bottom:2px}
 .dashboard-content{width:min(86%,1440px);margin:0 auto;padding-top:28px}
@@ -127,6 +132,7 @@ body:has(.login-page) .site-footer{display:none}
  .site-brand-copy{font-size:.9rem}.site-brand-copy small{display:none}.site-nav>a:first-child{display:none}.home-hero{min-height:100svh}.hero-content h1{font-size:clamp(2.7rem,13vw,4rem)}.hero-actions a{width:100%}.desktop-break{display:none}
  section:not(.home-hero):not(.capability-strip):not(.auth-story):not(.auth-panel){padding:18px 14px}button{max-width:100%}
  .site-nav{gap:14px}.cinema-row{grid-template-columns:1fr}.cinema-row>strong,.cinema-row>span,.cinema-row .cinema-status,.cinema-action{grid-column:1;grid-row:auto}.cinema-action{width:100%;margin-top:8px}.dashboard-invitations li{align-items:stretch;flex-direction:column}.dashboard-invitations li button{width:100%}
+ .back-link{margin-bottom:18px;font-size:.82rem}
 }
 @media(max-height:700px) and (min-width:821px){
  .login-page{grid-template-columns:minmax(0,1fr) minmax(350px,36vw);padding:88px clamp(30px,5vw,72px) 16px;background-position:center 44%}

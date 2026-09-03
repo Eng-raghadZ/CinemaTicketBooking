@@ -7,6 +7,7 @@ import {
 import { createServerSupabaseClient } from "@/lib/auth/server";
 import { InviteStaffForm } from "./invite-form";
 import { RevokeStaffButton } from "./revoke-button";
+import { BackLink } from "@/components/back-link";
 
 interface StaffRow {
   id: string;
@@ -56,6 +57,7 @@ export default async function CinemaStaffPage({
 
   return (
     <main>
+      <BackLink href={`/dashboard/${cinemaId}`} label="Cinema dashboard" />
       <h1>Staff</h1>
       <table>
         <thead>

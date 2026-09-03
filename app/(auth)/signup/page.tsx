@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { SignupForm } from "./signup-form";
+import { BackLink } from "@/components/back-link";
 
 export default function SignupPage() {
   return (
     <main className="auth-page">
       <section className="auth-story">
+        <BackLink href="/" label="Home" />
         <p className="eyebrow">JOIN MOVIERA</p>
         <h1>Build the operating space behind every screening.</h1>
         <p>Create an account to register a cinema and manage the functionality currently available.</p>

@@ -1,6 +1,7 @@
 import { LoginForm } from "./login-form";
 import Link from "next/link";
 import { safeInternalRedirectPath } from "@/lib/auth/redirect";
+import { BackLink } from "@/components/back-link";
 
 type LoginPageProps = {
   searchParams: Promise<{ redirectTo?: string }>;
@@ -16,6 +17,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   return (
     <main className="auth-page login-page">
       <section className="auth-story login-story">
+        <BackLink href="/" label="Home" />
         <p className="eyebrow">MOVIERA ACCESS</p>
         <h1>Your cinema. Your team. One control room.</h1>
         <p>Return to the management workspace for your cinemas, staff, screens, movies, and showtimes.</p>

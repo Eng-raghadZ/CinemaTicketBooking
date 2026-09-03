@@ -1,6 +1,7 @@
 import { requirePlatformAdmin } from "@/lib/auth/guards";
 import { createServerSupabaseClient } from "@/lib/auth/server";
 import { MovieForm } from "./movie-form";
+import { BackLink } from "@/components/back-link";
 
 interface MovieRow {
   id: string;
@@ -25,6 +26,7 @@ export default async function AdminMoviesPage() {
 
   return (
     <main>
+      <BackLink href="/dashboard/cinemas" label="Cinema reviews" />
       <h1>Movie catalog</h1>
       <p>
         This is the platform-wide master catalog. Cinema owners select from these titles for
