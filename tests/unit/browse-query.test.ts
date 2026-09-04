@@ -3,13 +3,16 @@ import {
   MAX_PAGE,
   PAGE_SIZE,
   buildContainsPattern,
+  buildPageHref,
   escapeIlikeWildcards,
   firstParam,
+  isRangeNotSatisfiableError,
   isValidUuid,
   parseDateParam,
   parsePageParam,
   parseSearchParam,
   rangeForPage,
+  resolvePage,
   totalPages,
   utcDayBounds,
 } from "@/lib/catalog/browse-query";
@@ -173,5 +176,107 @@ describe("utcDayBounds", () => {
 
   it("returns null for an invalid date", () => {
     expect(utcDayBounds("not-a-date")).toBeNull();
+  });
+});
+
+describe("resolvePage (pagination out-of-range handling)", () => {
+  it("does not redirect when the requested page is within range", () => {
+    // 45 rows at 20/page = 3 pages; page 3 is the last valid page.
+    expect(resolvePage(3, 45, 20)).toEqual({ page: 3, pages: 3, needsRedirect: false });
+  });
+
+  it("does not redirect for page 1 of a normal result set", () => {
+    expect(resolvePage(1, 45, 20)).toEqual({ page: 1, pages: 3, needsRedirect: false });
+  });
+
+  it("normalizes a page beyond the real result count to the last page and signals a redirect", () => {
+    // 45 rows at 20/page = 3 pages; page 10 does not exist.
+    expect(resolvePage(10, 45, 20)).toEqual({ page: 3, pages: 3, needsRedirect: true });
+  });
+
+  it("handles an extremely large (but already MAX_PAGE-clamped) requested page against a small dataset", () => {
+    expect(resolvePage(MAX_PAGE, 45, 20)).toEqual({ page: 3, pages: 3, needsRedirect: true });
+  });
+
+  it("handles an empty dataset: page 1 needs no redirect", () => {
+    expect(resolvePage(1, 0)).toEqual({ page: 1, pages: 1, needsRedirect: false });
+  });
+
+  it("handles an empty dataset: any page beyond 1 redirects to page 1", () => {
+    expect(resolvePage(5, 0)).toEqual({ page: 1, pages: 1, needsRedirect: true });
+    expect(resolvePage(MAX_PAGE, 0)).toEqual({ page: 1, pages: 1, needsRedirect: true });
+  });
+
+  it("never redirects to a page that itself would need another redirect (single-hop convergence)", () => {
+    const first = resolvePage(999, 45, 20);
+    expect(first.needsRedirect).toBe(true);
+    // Recomputing resolvePage with the SAME totalCount for the page we
+    // just redirected to must be stable — this is what guarantees the
+    // real page component's redirect can't loop under stable data.
+    const second = resolvePage(first.page, 45, 20);
+    expect(second.needsRedirect).toBe(false);
+    expect(second.page).toBe(first.page);
+  });
+
+  it("handles a huge total count without overflow or incorrect clamping", () => {
+    const result = resolvePage(1, 10_000_000, PAGE_SIZE);
+    expect(result.needsRedirect).toBe(false);
+    expect(result.page).toBe(1);
+    expect(result.pages).toBe(totalPages(10_000_000, PAGE_SIZE));
+  });
+});
+
+describe("isRangeNotSatisfiableError (distinguishing out-of-range from genuine failures)", () => {
+  it("recognizes PostgREST's PGRST103 code as a range-not-satisfiable error", () => {
+    expect(isRangeNotSatisfiableError({ code: "PGRST103", message: "Requested range not satisfiable" })).toBe(
+      true,
+    );
+  });
+
+  it("recognizes a range-not-satisfiable error by message even without the exact code", () => {
+    expect(isRangeNotSatisfiableError({ message: "Requested Range Not Satisfiable" })).toBe(true);
+  });
+
+  it("does NOT classify a genuine, unrelated database error as range-not-satisfiable", () => {
+    expect(isRangeNotSatisfiableError({ code: "PGRST301", message: "JWT expired" })).toBe(false);
+    expect(isRangeNotSatisfiableError({ code: "42501", message: "permission denied for table cinemas" })).toBe(
+      false,
+    );
+    expect(isRangeNotSatisfiableError({ message: "network error" })).toBe(false);
+  });
+
+  it("returns false for null/undefined (no error at all)", () => {
+    expect(isRangeNotSatisfiableError(null)).toBe(false);
+    expect(isRangeNotSatisfiableError(undefined)).toBe(false);
+  });
+});
+
+describe("buildPageHref (filter-preserving pagination links)", () => {
+  it("builds a bare page link with no filters", () => {
+    expect(buildPageHref("/cinemas", { q: undefined }, 1)).toBe("/cinemas?page=1");
+  });
+
+  it("preserves a single active filter", () => {
+    expect(buildPageHref("/movies", { q: "batman" }, 2)).toBe("/movies?q=batman&page=2");
+  });
+
+  it("preserves multiple active filters and omits inactive ones", () => {
+    const href = buildPageHref(
+      "/showtimes",
+      { date: "2026-06-15", cinemaId: "11111111-1111-4111-8111-111111111111", movieId: undefined },
+      3,
+    );
+    expect(href).toBe(
+      "/showtimes?date=2026-06-15&cinemaId=11111111-1111-4111-8111-111111111111&page=3",
+    );
+  });
+
+  it("omits an empty-string filter the same as undefined", () => {
+    expect(buildPageHref("/cinemas", { q: "" }, 1)).toBe("/cinemas?page=1");
+  });
+
+  it("always places page last regardless of filter insertion order", () => {
+    const href = buildPageHref("/showtimes", { movieId: "abc", date: "2026-01-01" }, 5);
+    expect(href.endsWith("page=5")).toBe(true);
   });
 });

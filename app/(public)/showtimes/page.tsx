@@ -1,12 +1,15 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { createServerSupabaseClient } from "@/lib/auth/server";
 import {
+  buildPageHref,
   firstParam,
+  isRangeNotSatisfiableError,
   isValidUuid,
   parseDateParam,
   parsePageParam,
   rangeForPage,
-  totalPages,
+  resolvePage,
   utcDayBounds,
 } from "@/lib/catalog/browse-query";
 
@@ -28,6 +31,10 @@ export const metadata = { title: "Upcoming showtimes" };
  * showtime whose cinema is approved — a public visitor never sees a
  * showtime belonging to a pending/rejected/suspended cinema, enforced at
  * the database layer.
+ *
+ * Pagination safety: same count-then-redirect pattern as /cinemas and
+ * /movies — see lib/catalog/browse-query.ts's `resolvePage()` and
+ * docs/phase3-customer-browsing.md's "Pagination correctness" section.
  */
 export default async function PublicShowtimesPage({
   searchParams,
@@ -40,21 +47,55 @@ export default async function PublicShowtimesPage({
   const cinemaId = rawCinemaId && isValidUuid(rawCinemaId) ? rawCinemaId : undefined;
   const rawMovieId = firstParam(sp.movieId);
   const movieId = rawMovieId && isValidUuid(rawMovieId) ? rawMovieId : undefined;
-  const page = parsePageParam(firstParam(sp.page));
-  const [from, to] = rangeForPage(page);
+  const requestedPage = parsePageParam(firstParam(sp.page));
+
+  const pageHref = (targetPage: number) =>
+    buildPageHref("/showtimes", { date, cinemaId, movieId }, targetPage);
 
   const supabase = await createServerSupabaseClient();
+  const bounds = date ? utcDayBounds(date) : null;
 
+  // Step 1: a cheap, row-free count query using the exact same filters as
+  // the real data query below, so we know how many pages actually exist
+  // BEFORE ever sending a `.range()` request that could be out of bounds.
+  let countQuery = supabase.from("showtimes").select("id", { count: "exact", head: true });
+  if (bounds) {
+    countQuery = countQuery.gte("starts_at", bounds.start.toISOString()).lt("starts_at", bounds.end.toISOString());
+  } else {
+    countQuery = countQuery.gte("starts_at", new Date().toISOString());
+  }
+  if (cinemaId) countQuery = countQuery.eq("cinema_id", cinemaId);
+  if (movieId) countQuery = countQuery.eq("movie_id", movieId);
+
+  const { count, error: countError } = await countQuery;
+
+  if (countError) {
+    return (
+      <main>
+        <h1>Upcoming showtimes</h1>
+        <p role="alert">Could not load showtimes right now. Please try again.</p>
+      </main>
+    );
+  }
+
+  const { page, pages, needsRedirect } = resolvePage(requestedPage, count ?? 0);
+
+  // Step 2: canonically redirect to the last real page, preserving every
+  // active filter, instead of ever sending an out-of-range `.range()`
+  // request — see the identical comment on /cinemas for why this can't
+  // loop.
+  if (needsRedirect) {
+    redirect(pageHref(page));
+  }
+
+  const [from, to] = rangeForPage(page);
   let query = supabase
     .from("showtimes")
     .select(
       "id, starts_at, base_price, currency_code, movies:movie_id(id, title), cinemas:cinema_id(id, name), screens:screen_id(name)",
-      { count: "exact" },
     )
     .order("starts_at", { ascending: true })
     .range(from, to);
-
-  const bounds = date ? utcDayBounds(date) : null;
   if (bounds) {
     query = query.gte("starts_at", bounds.start.toISOString()).lt("starts_at", bounds.end.toISOString());
   } else {
@@ -63,20 +104,21 @@ export default async function PublicShowtimesPage({
   if (cinemaId) query = query.eq("cinema_id", cinemaId);
   if (movieId) query = query.eq("movie_id", movieId);
 
-  const { data, count, error } = await query;
+  const { data, error } = await query;
+
+  // `page` is guaranteed in range by Step 1/2 above, so any error here is
+  // a genuine failure, not an out-of-range page. isRangeNotSatisfiableError
+  // is defense-in-depth only — see the identical comment on /cinemas.
+  if (error && !isRangeNotSatisfiableError(error)) {
+    return (
+      <main>
+        <h1>Upcoming showtimes</h1>
+        <p role="alert">Could not load showtimes right now. Please try again.</p>
+      </main>
+    );
+  }
+
   const showtimes = (data ?? []) as unknown as ShowtimeRow[];
-  const pages = totalPages(count ?? 0);
-
-  const baseParams: Record<string, string> = {};
-  if (date) baseParams.date = date;
-  if (cinemaId) baseParams.cinemaId = cinemaId;
-  if (movieId) baseParams.movieId = movieId;
-
-  const pageHref = (targetPage: number) => {
-    const sp2 = new URLSearchParams(baseParams);
-    sp2.set("page", String(targetPage));
-    return `/showtimes?${sp2.toString()}`;
-  };
 
   return (
     <main>
@@ -91,9 +133,7 @@ export default async function PublicShowtimesPage({
       </form>
       {(date || cinemaId || movieId) && <Link href="/showtimes">Clear all filters</Link>}
 
-      {error && <p role="alert">Could not load showtimes right now. Please try again.</p>}
-
-      {!error && showtimes.length === 0 && (
+      {showtimes.length === 0 && (
         <p>{date ? `No showtimes on ${date}.` : "No upcoming showtimes."}</p>
       )}
 

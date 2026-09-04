@@ -223,12 +223,11 @@ line of defense).
   `[start, end)` UTC window via `utcDayBounds`. An invalid or malformed
   date silently falls back to "no date filter" rather than erroring the
   page.
-- **Pagination** (`?page=`): 20 results per page (`PAGE_SIZE`), computed
-  via Supabase's `.range()`. A missing/invalid/negative page defaults to
-  1; an excessively large page is clamped to `MAX_PAGE` (500) so a crafted
-  `?page=999999` can't force an unbounded `OFFSET` scan.
+- **Pagination** (`?page=`) — see the dedicated "Pagination correctness"
+  section immediately below for the full, corrected behavior.
 - All of the above (`parsePageParam`, `parseSearchParam`, `parseDateParam`,
-  `isValidUuid`, `rangeForPage`, `totalPages`, `escapeIlikeWildcards`,
+  `isValidUuid`, `rangeForPage`, `totalPages`, `resolvePage`,
+  `isRangeNotSatisfiableError`, `buildPageHref`, `escapeIlikeWildcards`,
   `buildContainsPattern`, `utcDayBounds`) are pure, DB-free functions in
   `lib/catalog/browse-query.ts`, unit-tested independently of any database
   or Next.js request — same pattern as `lib/catalog/seat-layout.ts` and
@@ -237,7 +236,90 @@ line of defense).
   well-formed UUIDs (`isValidUuid`) before ever being used in a query; a
   malformed id renders `notFound()` immediately.
 
-## Showtime visibility rules
+## Pagination correctness
+
+**Corrected behavior (this was a real defect, found during manual E2E
+testing, not a pre-emptive design choice).** Visiting `/cinemas?page=999999`,
+`/movies?page=999999`, or `/showtimes?page=999999` as an anonymous visitor
+used to render "Could not load … right now. Please try again." — a false
+"service failure" message for what is completely normal user input (an
+out-of-range page number).
+
+**Root cause.** All three list pages combined `.select(..., { count:
+"exact" })` with `.range(from, to)` in a single Supabase call. When `page`
+is clamped to `MAX_PAGE` (500) but the real dataset has far fewer rows, the
+resulting `.range()` offset is beyond the actual row count. PostgREST does
+not silently return zero rows for that case — a `.range()` request whose
+start offset exceeds the table's total row count is rejected outright with
+HTTP 416 / error code `PGRST103` ("Requested range not satisfiable"). Every
+page's code treated *any* `error` from that combined call as a generic
+database failure, so a syntactically valid but out-of-range page number was
+indistinguishable from Supabase actually being down.
+
+**The fix — count-then-redirect, not error-catching.** Each list page now:
+
+1. Runs a cheap, row-free count query first —
+   `.select("id", { count: "exact", head: true })` — using the *exact same
+   filters* as the eventual data query, but with no `.range()` at all. This
+   can never produce a range error, since it has no range.
+2. Calls `resolvePage(requestedPage, count, PAGE_SIZE)`
+   (`lib/catalog/browse-query.ts`), a pure function that compares the
+   requested page against the real page count and returns either the same
+   page (in range) or the last real page plus a `needsRedirect: true` flag.
+3. If `needsRedirect` is true, the page calls Next's `redirect()` to the
+   canonical last-page URL — built via `buildPageHref(basePath, filters,
+   page)`, which preserves every active filter (`q`, `date`, `cinemaId`,
+   `movieId`) — **before ever sending a `.range()` request for the
+   out-of-range page.**
+4. Only then does the page run the actual data query with `.range()`, using
+   a page number that is now mathematically guaranteed to be in bounds.
+
+Because the data query's range is always valid by construction, any error
+it returns afterward is a genuine failure (network, RLS denial, Supabase
+outage) — not an out-of-range page — so the existing "Could not load…"
+message is now only ever shown for an actual failure. This is a stronger
+and more principled distinction than trying to pattern-match error codes:
+the out-of-range case is *prevented*, not *caught*.
+
+**Defense-in-depth, not the primary mechanism.** A second helper,
+`isRangeNotSatisfiableError(error)`, recognizes PostgREST's `PGRST103` code
+(or a matching message) and is checked after the final data query too. This
+exists solely for the narrow, unavoidable race where a row is deleted
+between the count query and the data query (e.g. an admin removes the last
+cinema on the last page a fraction of a second after the count ran) — in
+that rare case the page degrades to an empty/normalized result rather than
+a scary failure message, instead of relying on the count-then-redirect step
+alone. It is explicitly documented as secondary: the correctness guarantee
+comes from never sending an invalid range in the first place, not from
+detecting the error afterward.
+
+**No reliance on short-circuit evaluation or heuristics.** The fix does not
+try to guess whether a page is "probably" out of range, nor does it depend
+on any particular error-message wording as its primary signal — it computes
+the real page count first and only ever queries a page number already known
+to exist.
+
+**Bounds and safety preserved:**
+- `MAX_PAGE` (500) is unchanged — a crafted `?page=999999999` still can't
+  force an unbounded offset; `parsePageParam` clamps it before `resolvePage`
+  ever sees it.
+- Missing, non-numeric, fractional, zero, negative, `NaN`, and infinite page
+  values are all still handled by the pre-existing `parsePageParam` (see
+  its own unit tests) — this fix only changes what happens *after* a
+  syntactically valid page number turns out to be beyond the real result
+  count.
+- No RLS policy or grant was touched — this is purely an application-layer
+  query-sequencing fix, not a database change. No migration was added for
+  this fix.
+- No redirect loop is possible under stable data: `resolvePage`'s output
+  page always satisfies `page <= pages` for the *same* filters, so
+  recomputing `resolvePage` for that same page on the next request always
+  yields `needsRedirect: false` — verified directly in
+  `tests/unit/browse-query.test.ts`'s "never redirects to a page that
+  itself would need another redirect" test.
+- Applied identically to `/cinemas`, `/movies`, and `/showtimes` — the same
+  `resolvePage`/`buildPageHref`/`isRangeNotSatisfiableError` helpers, the
+  same two-query sequencing, the same redirect call.
 
 - Default view (no `?date=`): only showtimes with `starts_at >= now()`,
   ordered ascending, capped at 50 rows on detail pages and paginated (20
@@ -263,6 +345,9 @@ line of defense).
 - No movies currently offered by any approved cinema → "No movies are
   currently showing at any approved cinema."
 - No movies match a search → `No movies match "…"`.
+- A `?page=` beyond the real result count on `/cinemas`, `/movies`, or
+  `/showtimes` → a canonical redirect to the last real page (see
+  "Pagination correctness" above) — **never** a "Could not load" message.
 - An invalid/non-existent/non-approved `cinemaId`, `movieId`, or
   `showtimeId` → Next.js `notFound()` (standard 404), never a raw error
   page and never information distinguishing "doesn't exist" from "exists
@@ -273,11 +358,20 @@ line of defense).
 
 ## Tests added
 
-- **`tests/unit/browse-query.test.ts`** (33 tests) — every pure helper in
+- **`tests/unit/browse-query.test.ts`** (50 tests) — every pure helper in
   `lib/catalog/browse-query.ts`: page-param clamping/defaulting,
   search-param trimming/truncation, date validation (including
   calendar-invalid dates), UUID validation, pagination range/page-count
-  math, ILIKE wildcard escaping, and UTC day-bounds computation.
+  math, ILIKE wildcard escaping, UTC day-bounds computation, and (added for
+  the pagination fix) `resolvePage`'s out-of-range/redirect decisions
+  (in-range page, page beyond the real count, an extremely large
+  already-clamped page against a small dataset, an empty dataset on page 1
+  vs. beyond page 1, single-hop redirect convergence, and a very large
+  total count), `isRangeNotSatisfiableError`'s classification of
+  `PGRST103` vs. a genuine unrelated error (JWT expiry, permission denied,
+  network failure) vs. no error at all, and `buildPageHref`'s filter
+  preservation (single filter, multiple filters, an inactive/undefined
+  filter omitted, an empty-string filter treated as inactive).
 - **`tests/integration/public-browsing-rls.test.ts`** (23 tests, real
   Postgres via the `anon` role) — approved cinemas are visible and
   pending/suspended cinemas are not; `cinema_staff`, `audit_logs`, and

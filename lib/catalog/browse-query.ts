@@ -126,3 +126,81 @@ export function utcDayBounds(dateStr: string): { start: Date; end: Date } | null
   const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
   return { start, end };
 }
+
+export interface PageResolution {
+  /** The page to actually query/render — always <= `pages`. */
+  page: number;
+  /** Total page count for the current filters (always >= 1). */
+  pages: number;
+  /** True if `requestedPage` didn't exist and was normalized down to `pages`. */
+  needsRedirect: boolean;
+}
+
+/**
+ * Decides, from an already-validated (parsePageParam-clamped) requested
+ * page and the ACTUAL total row count for the current filters, whether the
+ * requested page exists. If not, it returns the last real page and signals
+ * that the caller should canonically redirect there — this is what lets
+ * every list page know a page is out of range BEFORE ever sending a
+ * `.range()` request for it, since PostgREST rejects an out-of-range range
+ * request outright (see isRangeNotSatisfiableError below) rather than
+ * quietly returning zero rows.
+ *
+ * Pure and DB-free: the caller is responsible for running a cheap
+ * `count`-only query first (e.g. `.select("id", { count: "exact", head:
+ * true })` with the same filters as the real data query) and passing the
+ * result in, and for actually performing the redirect.
+ */
+export function resolvePage(
+  requestedPage: number,
+  totalCount: number,
+  pageSize = PAGE_SIZE,
+): PageResolution {
+  const pages = totalPages(totalCount, pageSize);
+  if (requestedPage > pages) {
+    return { page: pages, pages, needsRedirect: true };
+  }
+  return { page: requestedPage, pages, needsRedirect: false };
+}
+
+/**
+ * Classifies a Supabase/PostgREST error as "the requested range doesn't
+ * exist" (PostgREST's PGRST103, returned as an HTTP 416 when a `.range()`
+ * offset is beyond the actual row count) as opposed to a genuine
+ * query/service failure.
+ *
+ * This is deliberately NOT the primary mechanism for handling an
+ * out-of-range page — resolvePage()'s count-then-redirect pattern is,
+ * because it stops an out-of-range `.range()` request from ever being sent
+ * in the first place. This classifier exists only as defense-in-depth for
+ * the narrow race where a row is deleted between the count query and the
+ * data query, so that rare case still degrades to an empty/normalized
+ * result instead of a scary "Could not load" message.
+ */
+export function isRangeNotSatisfiableError(
+  error: { code?: string | null; message?: string | null } | null | undefined,
+): boolean {
+  if (!error) return false;
+  if (error.code === "PGRST103") return true;
+  return typeof error.message === "string" && /range.*not satisfiable/i.test(error.message);
+}
+
+/**
+ * Builds a canonical `?filter=...&page=N` href for a public list page,
+ * preserving every active filter. Shared by /cinemas, /movies, and
+ * /showtimes so their pagination links and out-of-range redirect targets
+ * are built identically — `undefined`/empty filter values are simply
+ * omitted rather than serialized as `key=`.
+ */
+export function buildPageHref(
+  basePath: string,
+  filters: Record<string, string | undefined>,
+  page: number,
+): string {
+  const sp = new URLSearchParams();
+  for (const [key, value] of Object.entries(filters)) {
+    if (value) sp.set(key, value);
+  }
+  sp.set("page", String(page));
+  return `${basePath}?${sp.toString()}`;
+}
