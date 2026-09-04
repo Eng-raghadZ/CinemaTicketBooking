@@ -2,8 +2,16 @@
 
 This documents what Phase 3 adds on top of the verified Phase 0–2 baseline
 (`docs/architecture-plan.md` v3, migrations `0001`–`0013`). No existing
-migration was modified, and **no new migration was required at all** — see
-"Why no migration was needed" below.
+migration was modified.
+
+**Correction:** the initial Phase 3 pass concluded no new migration was
+needed. Once integration tests were actually run against real Postgres
+(they could not be executed in the sandbox that produced the first pass),
+that conclusion turned out to be wrong in one specific, narrow way — a
+genuine RLS/grant defect on `screens`/`seats`, fixed by a new forward-only
+migration, `0014_public_screens_seats_read_fix.sql`. See "The one migration
+that *was* needed" below for the full root-cause and fix. Everything else
+in "Why (almost) no migration was needed" below remains accurate.
 
 ## What already existed from Phase 0–2 (not re-touched)
 
@@ -16,20 +24,101 @@ migration was modified, and **no new migration was required at all** — see
   session-bound, RLS-respecting client every other Server Component in the
   app already uses
 
-## Why no migration was needed
+## Why (almost) no migration was needed
 
-Every data-visibility rule Phase 3 requires was already enforced by
-existing RLS policies before this phase started:
+Every data-visibility rule Phase 3 requires — with one exception, covered
+in the next section — was already enforced by existing RLS policies before
+this phase started:
 
 | Requirement | Enforced by (pre-existing) |
 |---|---|
 | Only approved cinemas are publicly visible | `cinemas_select_public_approved` (`status = 'approved'`) |
 | Only movies/showtimes tied to an approved cinema are visible | `cinema_movies_select` / `showtimes_select` (`exists (... c.status = 'approved') OR is_active_cinema_staff(...) OR is_platform_admin()`) — an anonymous caller never satisfies the staff/admin branches, so only the approved-cinema branch applies |
-| Staff records, permissions, audit logs, other users' data stay private | No `SELECT` policy (or no grant) exists for `anon`/unauthenticated `authenticated` on `cinema_staff`, `audit_logs`, `users`, `bookings`, etc. — default-deny |
+| Staff records, permissions, audit logs, other users' data stay private | No `SELECT` grant exists for `anon` on `cinema_staff`, `audit_logs`, `users`, `bookings`, etc. at all (`0007_roles_and_grants.sql` never lists them) — the query is rejected at the table-grant level, before RLS is even evaluated |
 | Public browsing is read-only | `anon` was only ever granted `SELECT` (`0007_roles_and_grants.sql`) — no `INSERT`/`UPDATE`/`DELETE` grant exists for `anon` on any table |
 
 This was verified directly against real Postgres, not just read from the
-SQL — see `tests/integration/public-browsing-rls.test.ts`.
+SQL — see `tests/integration/public-browsing-rls.test.ts`. Note the second
+row's precise wording: a query against a fully private table doesn't
+"succeed and return zero rows" — Postgres rejects it outright with a
+table-level `permission denied` error, which is a *stronger* guarantee
+than RLS filtering would be, and the integration tests assert that
+rejection explicitly rather than treating an empty result as equivalent.
+
+## The one migration that *was* needed: `0014_public_screens_seats_read_fix.sql`
+
+Running the integration tests above against real Postgres (not possible in
+the sandbox that produced the first Phase 3 pass) surfaced a genuine
+functional defect: an anonymous `SELECT` on `screens` — and transitively
+`seats` — failed for an **approved** cinema's own screen, even though
+`screens_select_public` explicitly allows it, with:
+
+```
+permission denied for function can_manage_catalog
+```
+
+**Root cause.** `screens_write_manage_screens`
+(`0013_catalog_permission_enforcement.sql`) is a `for all` policy, so its
+`USING` clause — `is_platform_admin() OR can_manage_catalog(cinema_id,
+'manage_screens')` — applies to `SELECT` too, not just writes. Postgres
+combines every applicable permissive policy's qual with `OR` for a given
+command, so an anonymous `SELECT` on `screens` evaluates the combined
+expression `screens_select_public.qual OR screens_write_manage_screens.qual`
+— **both** clauses, not just whichever one happens to be true first.
+Postgres's planner does not guarantee left-to-right short-circuit
+evaluation order across combined RLS quals (clauses can be reordered for
+cost-based optimization), so `can_manage_catalog(...)` can still be
+evaluated even when `screens_select_public`'s clause has already made the
+whole expression true. `can_manage_catalog`'s `EXECUTE` privilege was
+explicitly revoked from `PUBLIC` in `0013` and only re-granted to
+`authenticated`/`service_role` — never `anon` — so evaluating it as `anon`
+threw a function-level permission error instead of quietly returning
+`false`. `seats_write_manage_screens` has the identical shape (it also
+calls `can_manage_catalog`, via a subquery joining `screens`), so `seats`
+had the same latent defect.
+
+**The fix.** `0014_public_screens_seats_read_fix.sql` grants `anon`
+`EXECUTE` on `can_manage_catalog(uuid, text)` — nothing else. This is safe
+because the function is `SECURITY DEFINER` and filters internally on
+`user_id = auth.uid()`, which is always `NULL` for an unauthenticated
+`anon` caller (no PostgREST request ever carries JWT claims for `anon`) —
+`user_id = NULL` can never match any row in `cinema_staff`, so the function
+always evaluates to `false` for `anon` regardless of what `cinema_staff`
+actually contains. Granting `EXECUTE` lets Postgres *evaluate* the boolean
+expression (required for the combined-OR semantics to resolve without
+erroring) without ever letting it *return true* for an anonymous caller —
+`anon` gains the ability to ask "can I manage this catalog?" and is always
+truthfully told "no," never the ability to manage anything, and the
+function returns only a boolean, never `cinema_staff` row contents.
+
+**What this explicitly does NOT change:** no table-level grant (`anon`
+still has zero grants on `cinema_staff`/`audit_logs`/`users`, and still has
+only ever been granted `SELECT` — never `INSERT`/`UPDATE`/`DELETE` — on
+`cinemas`/`screens`/`seats`/`movies`/`cinema_movies`/`showtimes`), and no
+RLS policy is added, dropped, or redefined. See the migration file itself
+for the complete reasoning.
+
+**Why this wasn't relying on short-circuiting to "fix" it instead:**
+reordering policies or restructuring the query to try to force
+`screens_select_public` to be checked "first" would not be a real fix —
+Postgres gives no guarantee about evaluation order for combined permissive
+policies, so anything depending on that order is fragile by construction.
+The only correct fix is to make every clause that *can* be evaluated safe
+*to* evaluate, which is exactly what granting `anon` `EXECUTE` on the
+function (while relying on its own internal `auth.uid()` check to keep it
+truthful) does.
+
+**Test-expectation fixes.** Two of the pre-existing test assertions in
+`tests/integration/public-browsing-rls.test.ts` were also wrong, unrelated
+to the `screens`/`seats` defect: they expected `SELECT` queries against
+`cinema_staff`, `audit_logs`, and `users` — tables `anon` has **no grant**
+on at all — to "succeed and return zero rows." That's not what actually
+happens or what should happen: a query against a table with no grant is
+rejected at the table-permission level with `permission denied for table
+<name>`, which is a stronger guarantee than RLS filtering. The tests now
+assert that rejection directly (`rejects.toThrow(/permission denied for
+table .../)`) instead of treating a successful-but-empty result as
+equivalent.
 
 ## What Phase 3 adds
 
@@ -189,17 +278,23 @@ line of defense).
   search-param trimming/truncation, date validation (including
   calendar-invalid dates), UUID validation, pagination range/page-count
   math, ILIKE wildcard escaping, and UTC day-bounds computation.
-- **`tests/integration/public-browsing-rls.test.ts`** (14 tests, real
+- **`tests/integration/public-browsing-rls.test.ts`** (23 tests, real
   Postgres via the `anon` role) — approved cinemas are visible and
-  pending/suspended cinemas are not; `cinema_staff`/`audit_logs`/`users`
-  remain unreadable to an anonymous visitor; a movie offered at an
-  approved cinema is visible via `cinema_movies` while one offered only at
-  a pending cinema is not (while confirming the master `movies` table
-  itself stays world-readable, which is why the app-layer eligibility
-  check exists); showtimes at an approved cinema are visible (including a
-  past one, at the RLS layer) while a showtime at a non-approved cinema is
-  not; screens for an approved cinema are readable; and an anonymous
-  visitor cannot write to `showtimes` at all.
+  pending/suspended cinemas are not; `cinema_staff`, `audit_logs`, and
+  `users` are rejected with a table-level `permission denied` error for an
+  anonymous visitor (not a filtered empty result — see "The one migration
+  that *was* needed" above for why that distinction matters); a movie
+  offered at an approved cinema is visible via `cinema_movies` while one
+  offered only at a pending cinema is not (while confirming the master
+  `movies` table itself stays world-readable, which is why the app-layer
+  eligibility check exists); showtimes at an approved cinema are visible
+  (including a past one, at the RLS layer) while a showtime at a
+  non-approved cinema is not; screens **and seats** for an approved
+  cinema are readable while a non-approved cinema's screen is not (the
+  `0014` regression coverage); `can_manage_catalog(...)` always evaluates
+  `false` for `anon` even though it's now executable; and an anonymous
+  visitor cannot `INSERT`/`UPDATE`/`DELETE` `showtimes`, `screens`,
+  `movies`, or `cinema_movies` under any circumstance.
 - Existing Phase 0–2 test suites (102 unit tests across
   `tests/unit/*.test.ts`, plus the existing integration files) were run
   unmodified and continue to pass — see verification results below.

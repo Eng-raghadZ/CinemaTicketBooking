@@ -8,9 +8,25 @@ import { adminSql, asUser } from "./db-helper";
  * tests prove the DATABASE (RLS from 0005_rls_policies.sql + grants from
  * 0007_roles_and_grants.sql) is what enforces public-browsing visibility,
  * not just that the app-layer queries in app/(public)/* happen to filter
- * correctly. No new migration was required for Phase 3 — see
- * docs/phase3-customer-browsing.md for the review that established this;
- * this file is what verifies that conclusion against real Postgres.
+ * correctly.
+ *
+ * CORRECTION (post-review): the original Phase 3 pass concluded no new
+ * migration was needed. Running these tests against real Postgres surfaced
+ * two defects that conclusion missed:
+ *   1. Three tests below wrongly expected cinema_staff/audit_logs/users
+ *      queries to "succeed and return zero rows" — those tables have no
+ *      `anon` SELECT grant at all, so the correct, intended outcome is a
+ *      table-level permission-denied error, not a filtered empty result.
+ *      Fixed by asserting rejection instead.
+ *   2. A genuine functional defect: `screens` (and transitively `seats`)
+ *      failed for `anon` even for an APPROVED cinema, because
+ *      can_manage_catalog()'s EXECUTE privilege was never granted to
+ *      `anon` and gets evaluated during SELECT anyway (RLS's combined-OR
+ *      quals across a `for all` policy are not guaranteed to
+ *      short-circuit). Fixed by
+ *      0014_public_screens_seats_read_fix.sql — see that migration and
+ *      the tests below for the full reasoning. See
+ *      docs/phase3-customer-browsing.md for the corrected account.
  *
  * Self-contained fixtures (own IDs), following the same pattern as
  * tests/integration/catalog-permissions-rls.test.ts, kept separate from
@@ -156,21 +172,32 @@ describe("Public cinema visibility (anon role)", () => {
     expect(rows).toHaveLength(0);
   });
 
-  it("an anonymous visitor cannot read cinema_staff rows for any cinema (never expose staff/permissions data)", async () => {
-    const rows = await asUser({ role: "anon" }, (tx) =>
-      tx`select id from cinema_staff where cinema_id = ${CINEMA_APPROVED}`,
+  // cinema_staff, audit_logs, and users are NOT publicly-readable tables at
+  // all — 0007_roles_and_grants.sql never grants `anon` SELECT on any of
+  // them. That means the query is rejected at the table-grant level,
+  // BEFORE Postgres ever evaluates row-level security: the correct,
+  // intended failure mode is a table-level "permission denied" error, not
+  // a successful query that RLS happens to filter down to zero rows. (A
+  // zero-row *result* would actually be the wrong signal here — it would
+  // mean the table was readable and only RLS was hiding the rows, which is
+  // a weaker guarantee than what's actually configured. Asserting the
+  // rejection itself is what proves the table-grant boundary exists.)
+  it("an anonymous visitor is rejected at the table-grant level reading cinema_staff (never expose staff/permissions data)", async () => {
+    await expect(
+      asUser({ role: "anon" }, (tx) => tx`select id from cinema_staff where cinema_id = ${CINEMA_APPROVED}`),
+    ).rejects.toThrow(/permission denied for table cinema_staff/i);
+  });
+
+  it("an anonymous visitor is rejected at the table-grant level reading audit_logs", async () => {
+    await expect(asUser({ role: "anon" }, (tx) => tx`select id from audit_logs`)).rejects.toThrow(
+      /permission denied for table audit_logs/i,
     );
-    expect(rows).toHaveLength(0);
   });
 
-  it("an anonymous visitor cannot read audit_logs", async () => {
-    const rows = await asUser({ role: "anon" }, (tx) => tx`select id from audit_logs`);
-    expect(rows).toHaveLength(0);
-  });
-
-  it("an anonymous visitor cannot read another user's booking data (users table stays private)", async () => {
-    const rows = await asUser({ role: "anon" }, (tx) => tx`select id from users`);
-    expect(rows).toHaveLength(0);
+  it("an anonymous visitor is rejected at the table-grant level reading users (users table stays completely private)", async () => {
+    await expect(asUser({ role: "anon" }, (tx) => tx`select id from users`)).rejects.toThrow(
+      /permission denied for table users/i,
+    );
   });
 });
 
@@ -219,6 +246,17 @@ describe("Public showtime visibility (anon role)", () => {
     expect(rows).toHaveLength(1);
   });
 
+  // screens_write_manage_screens (0013) is a `for all` policy, so its
+  // USING clause — which calls can_manage_catalog(cinema_id,
+  // 'manage_screens') — is combined via OR with screens_select_public's
+  // qual for EVERY SELECT, not just writes. can_manage_catalog's EXECUTE
+  // privilege was revoked from PUBLIC in 0013 and only re-granted to
+  // authenticated/service_role, so without 0014's anon grant this query
+  // failed with "permission denied for function can_manage_catalog" even
+  // though screens_select_public alone already makes the row visible —
+  // Postgres does not guarantee short-circuiting across combined RLS
+  // quals. See 0014_public_screens_seats_read_fix.sql for the fix and full
+  // reasoning.
   it("screens for an approved cinema are visible to anon (needed to display the screen name on a showtime)", async () => {
     const rows = await asUser({ role: "anon" }, (tx) =>
       tx`select id from screens where id = ${SCREEN_APPROVED}`,
@@ -226,10 +264,86 @@ describe("Public showtime visibility (anon role)", () => {
     expect(rows).toHaveLength(1);
   });
 
+  it("screens for a NON-approved cinema remain invisible to anon (the grant fix only enables evaluation, not a true result, for an anonymous caller)", async () => {
+    const [pendingScreen] = await admin`select id from screens where cinema_id = ${CINEMA_PENDING}`;
+    const rows = await asUser({ role: "anon" }, (tx) => tx`select id from screens where id = ${pendingScreen.id}`);
+    expect(rows).toHaveLength(0);
+  });
+
+  // Same combined-OR shape as screens (seats_write_manage_screens is also
+  // `for all` and also calls can_manage_catalog, via a subquery joining
+  // screens) — regression coverage for the identical bug pattern on a
+  // second table, fixed by the same 0014 grant.
+  it("seats for an approved cinema's screen are visible to anon", async () => {
+    await admin`insert into seats (screen_id, row, number) values (${SCREEN_APPROVED}, 'A', 1)`;
+    const rows = await asUser({ role: "anon" }, (tx) => tx`select id from seats where screen_id = ${SCREEN_APPROVED}`);
+    expect(rows).toHaveLength(1);
+  });
+
+  it("an anonymous visitor cannot gain catalog-management capability through the can_manage_catalog grant (it always evaluates false for anon)", async () => {
+    const rows = await asUser({ role: "anon" }, (tx) =>
+      tx`select can_manage_catalog(${CINEMA_APPROVED}::uuid, 'manage_screens') as can_manage`,
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0].can_manage).toBe(false);
+  });
+
   it("an anonymous visitor cannot write to showtimes (public browsing is read-only)", async () => {
     await expect(
       asUser({ role: "anon" }, (tx) =>
         tx`update showtimes set base_price = 0.01 where id = ${SHOWTIME_APPROVED_FUTURE}`,
+      ),
+    ).rejects.toThrow();
+  });
+});
+
+// Requirement: anon must not insert, update, or delete screens, showtimes,
+// movies, or cinema_movies associations. The showtimes UPDATE case is
+// covered above; this block covers the remaining three tables explicitly,
+// including screens specifically — the exact table the 0014 read-fix
+// touches — to prove the read-side grant fix did not also loosen any
+// write-side boundary.
+describe("Public browsing remains read-only for anon (0014's read grant did not loosen writes)", () => {
+  it("cannot insert a screen for an approved cinema", async () => {
+    await expect(
+      asUser({ role: "anon" }, (tx) =>
+        tx`insert into screens (cinema_id, name) values (${CINEMA_APPROVED}, 'Anon Screen')`,
+      ),
+    ).rejects.toThrow();
+  });
+
+  it("cannot update a screen for an approved cinema", async () => {
+    await expect(
+      asUser({ role: "anon" }, (tx) => tx`update screens set name = 'Hacked' where id = ${SCREEN_APPROVED}`),
+    ).rejects.toThrow();
+  });
+
+  it("cannot delete a screen for an approved cinema", async () => {
+    await expect(
+      asUser({ role: "anon" }, (tx) => tx`delete from screens where id = ${SCREEN_APPROVED}`),
+    ).rejects.toThrow();
+  });
+
+  it("cannot insert a movie into the master catalog", async () => {
+    await expect(
+      asUser({ role: "anon" }, (tx) =>
+        tx`insert into movies (title, duration_minutes, created_by) values ('Anon Movie', 90, ${ADMIN_USER})`,
+      ),
+    ).rejects.toThrow();
+  });
+
+  it("cannot add a cinema_movies association", async () => {
+    await expect(
+      asUser({ role: "anon" }, (tx) =>
+        tx`insert into cinema_movies (cinema_id, movie_id, added_by) values (${CINEMA_APPROVED}, ${MOVIE_ONLY_AT_PENDING}, ${ADMIN_USER})`,
+      ),
+    ).rejects.toThrow();
+  });
+
+  it("cannot remove an existing cinema_movies association", async () => {
+    await expect(
+      asUser({ role: "anon" }, (tx) =>
+        tx`delete from cinema_movies where cinema_id = ${CINEMA_APPROVED} and movie_id = ${MOVIE_AT_APPROVED}`,
       ),
     ).rejects.toThrow();
   });
