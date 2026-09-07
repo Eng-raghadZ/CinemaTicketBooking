@@ -1,0 +1,107 @@
+-- 0014_public_screens_seats_read_fix.sql
+-- Phase 3 hardening. Discovered while writing integration tests for public
+-- browsing (tests/integration/public-browsing-rls.test.ts): an anonymous
+-- (`anon`) SELECT on `screens` for an APPROVED cinema — which
+-- screens_select_public explicitly allows — was failing with
+--   permission denied for function can_manage_catalog
+-- instead of returning the row.
+--
+-- ---------------------------------------------------------------------------
+-- ROOT CAUSE
+-- ---------------------------------------------------------------------------
+-- screens_write_manage_screens (0013_catalog_permission_enforcement.sql) is
+-- a `for all` policy:
+--
+--   create policy screens_write_manage_screens on screens
+--     for all using (
+--       is_platform_admin()
+--       or can_manage_catalog(cinema_id, 'manage_screens')
+--     ) ...
+--
+-- A `for all` policy's USING clause applies to SELECT too, not just
+-- writes. Postgres combines every applicable *permissive* policy's qual
+-- with OR for a given command — so an anon SELECT on `screens` evaluates
+-- the logical OR of BOTH:
+--   screens_select_public.qual           (true for an approved cinema)
+--   screens_write_manage_screens.qual    (is_platform_admin() OR
+--                                          can_manage_catalog(cinema_id,
+--                                          'manage_screens'))
+--
+-- Even though screens_select_public's clause alone already makes the
+-- combined expression true, PostgreSQL's planner does NOT guarantee
+-- left-to-right short-circuit evaluation order across combined RLS quals —
+-- clauses may be reordered for cost-based optimization, and a clause can
+-- still be evaluated (and can still error) even when another clause in the
+-- same OR expression is independently sufficient. This is exactly why
+-- relying on short-circuiting is not a valid fix here (a later reviewer
+-- correctly flagged this) — the correct fix is to make every clause that
+-- CAN be evaluated safe TO evaluate, not to hope it never gets evaluated.
+--
+-- can_manage_catalog(uuid, text) had its PUBLIC EXECUTE privilege
+-- explicitly revoked in 0013, then re-granted only to `authenticated` and
+-- `service_role` — `anon` was never included:
+--
+--   revoke all on function can_manage_catalog(uuid, text) from public;
+--   grant execute on function can_manage_catalog(uuid, text)
+--     to authenticated, service_role;
+--
+-- So when the planner evaluates that clause for an `anon` caller, Postgres
+-- raises a permission-denied error on the FUNCTION itself, before RLS ever
+-- gets to decide true/false — which surfaces as a hard query failure
+-- instead of the row simply being visible via the other, already-true
+-- clause. The identical shape exists on `seats_write_manage_screens`
+-- (0013), which also calls can_manage_catalog via a subquery joining
+-- `screens` — an anon SELECT on `seats` for an approved cinema's screen
+-- has the same latent failure, fixed by the same grant below.
+--
+-- ---------------------------------------------------------------------------
+-- WHY GRANTING anon EXECUTE ON can_manage_catalog IS SAFE
+-- ---------------------------------------------------------------------------
+-- can_manage_catalog is SECURITY DEFINER (owned by the migration-running,
+-- privileged role) and its body is:
+--
+--   select exists (
+--     select 1 from cinema_staff
+--     where cinema_id = target_cinema_id
+--       and user_id = auth.uid()
+--       and status = 'active'
+--       and (role = 'owner' or (role = 'manager' and ...))
+--   );
+--
+-- For the `anon` Postgres role, `auth.uid()` is always NULL — no request
+-- ever carries JWT claims for an unauthenticated PostgREST call (see
+-- tests/integration/fixtures/local-auth-shim.sql's auth.uid() definition:
+-- `nullif(auth.jwt() ->> 'sub', '')::uuid`, and auth.jwt() itself reads
+-- `request.jwt.claims`, which is never set for anon). `user_id = NULL` can
+-- never match any row in `cinema_staff` under normal SQL NULL semantics,
+-- regardless of what that table actually contains. So granting `anon`
+-- EXECUTE here lets Postgres *evaluate* the boolean expression (required
+-- for RLS's combined-OR semantics to resolve at all) without ever letting
+-- it *return true* for an anonymous caller: `anon` gains the ability to
+-- ask "can I manage this catalog?" and is always truthfully told "no" —
+-- never the ability to manage anything. The function returns only a
+-- boolean, never any `cinema_staff` row contents, so this leaks no staff
+-- data either.
+--
+-- ---------------------------------------------------------------------------
+-- WHAT THIS MIGRATION DOES NOT CHANGE
+-- ---------------------------------------------------------------------------
+-- - No table-level grant changes. `anon` still has NO SELECT grant on
+--   cinema_staff, audit_logs, or users (0007_roles_and_grants.sql never
+--   granted any of the three to anon) — a query against any of them as
+--   anon still fails with a table-level "permission denied" BEFORE RLS is
+--   even reached, which is the correct, intended behavior and is asserted
+--   directly in tests/integration/public-browsing-rls.test.ts.
+-- - No INSERT/UPDATE/DELETE grant changes anywhere. `anon` still has only
+--   ever been granted SELECT on cinemas, screens, seats, movies,
+--   cinema_movies, showtimes, cinema_cancellation_policies
+--   (0007_roles_and_grants.sql) — this migration does not add to that
+--   list or add any write grant.
+-- - No RLS policy is added, dropped, or redefined. screens_select_public,
+--   seats_select_public, screens_write_manage_screens, and
+--   seats_write_manage_screens (0005/0013) are unchanged; their write-side
+--   authorization logic (owner-or-manager-with-manage_screens) is
+--   unaffected — an anon caller still cannot satisfy
+--   can_manage_catalog(...)'s actual condition, only evaluate it.
+
+grant execute on function can_manage_catalog(uuid, text) to anon;

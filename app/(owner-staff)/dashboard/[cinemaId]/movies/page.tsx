@@ -25,18 +25,10 @@ export default async function CinemaMoviesPage({
 }) {
   const { cinemaId } = await params;
   const { role } = await requireCinemaStaffOrRedirect(cinemaId);
-  // Matches the RLS policy exactly: cinema_movies_write and
-  // showtimes_write both check cinema_staff_role_for(...) IN
-  // ('owner','manager') — a plain role-tier check, not the granular
-  // `manage_showtimes`/`manage_pricing` permission keys. Those keys exist
-  // in STAFF_PERMISSION_KEYS but are not yet wired into any RLS predicate
-  // or app-layer check for catalog writes (see docs/phase2-catalog-management.md
-  // "Known gap"). Any active manager can currently write here.
-  const canManage = hasMinCinemaStaffRole({ role, status: "active" }, "manager");
 
   const supabase = await createServerSupabaseClient();
 
-  const [{ data: catalogData }, { data: cinemaMoviesData, error: cinemaMoviesError }] =
+  const [{ data: catalogData }, { data: cinemaMoviesData, error: cinemaMoviesError }, { data: cinema }] =
     await Promise.all([
       supabase
         .from("movies")
@@ -46,9 +38,23 @@ export default async function CinemaMoviesPage({
         .from("cinema_movies")
         .select("movie_id, movies:movie_id(id, title, duration_minutes, rating)")
         .eq("cinema_id", cinemaId),
+      supabase.from("cinemas").select("status").eq("id", cinemaId).maybeSingle(),
     ]);
 
   if (cinemaMoviesError) notFound();
+
+  const isSuspended = cinema?.status === "suspended";
+  // Matches the RLS policy exactly: cinema_movies_insert/cinema_movies_delete
+  // (0015_suspended_cinema_state_enforcement.sql) both check
+  // cinema_staff_role_for(...) IN ('owner','manager') AND
+  // cinema_is_mutable(...) — a plain role-tier check plus the
+  // suspended-state gate, not the granular `manage_showtimes`/
+  // `manage_pricing` permission keys. Those keys exist in
+  // STAFF_PERMISSION_KEYS but are not yet wired into any RLS predicate or
+  // app-layer check for catalog writes (see
+  // docs/phase2-catalog-management.md "Known gap"). Any active manager can
+  // currently write here, but only while the cinema is not suspended.
+  const canManage = hasMinCinemaStaffRole({ role, status: "active" }, "manager") && !isSuspended;
 
   const catalog = (catalogData ?? []) as CatalogMovieRow[];
   const cinemaMovies = (cinemaMoviesData ?? []) as unknown as CinemaMovieRow[];
@@ -88,7 +94,10 @@ export default async function CinemaMoviesPage({
           )}
         </section>
       )}
-      {!canManage && (
+      {!canManage && isSuspended && (
+        <p role="alert">This cinema is suspended — catalog management is read-only until it is reinstated.</p>
+      )}
+      {!canManage && !isSuspended && (
         <p>Only the cinema owner or a manager can add or remove movies for this cinema.</p>
       )}
     </main>
