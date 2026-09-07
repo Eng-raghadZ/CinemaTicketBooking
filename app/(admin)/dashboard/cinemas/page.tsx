@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requirePlatformAdmin } from "@/lib/auth/guards";
+import { requirePlatformAdminOrRedirect } from "@/lib/auth/guards";
 import { createServerSupabaseClient } from "@/lib/auth/server";
 import { SignOutButton } from "@/app/(auth)/sign-out-button";
 
@@ -29,7 +29,7 @@ export default async function AdminCinemasPage({
 }: {
   searchParams: Promise<{ status?: string }>;
 }) {
-  await requirePlatformAdmin();
+  await requirePlatformAdminOrRedirect();
   const { status: rawStatus } = await searchParams;
   const status: StatusTab = isStatusTab(rawStatus)
     ? rawStatus

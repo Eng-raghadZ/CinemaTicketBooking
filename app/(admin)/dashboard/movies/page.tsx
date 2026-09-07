@@ -1,4 +1,4 @@
-import { requirePlatformAdmin } from "@/lib/auth/guards";
+import { requirePlatformAdminOrRedirect } from "@/lib/auth/guards";
 import { createServerSupabaseClient } from "@/lib/auth/server";
 import { SignOutButton } from "@/app/(auth)/sign-out-button";
 import { MovieForm } from "./movie-form";
@@ -14,7 +14,7 @@ interface MovieRow {
 }
 
 export default async function AdminMoviesPage() {
-  await requirePlatformAdmin();
+  await requirePlatformAdminOrRedirect();
 
   const supabase = await createServerSupabaseClient();
   const { data } = await supabase
