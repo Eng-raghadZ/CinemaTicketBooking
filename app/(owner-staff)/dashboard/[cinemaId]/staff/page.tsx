@@ -43,17 +43,26 @@ export default async function CinemaStaffPage({
   if (error) notFound();
   const staff = (data ?? []) as unknown as StaffRow[];
 
-  const { data: callerMembership } = await supabase
-    .from("cinema_staff")
-    .select("role, status, permissions")
-    .eq("cinema_id", cinemaId)
-    .eq("user_id", userId)
-    .eq("status", "active")
-    .maybeSingle();
+  const [{ data: callerMembership }, { data: cinema }] = await Promise.all([
+    supabase
+      .from("cinema_staff")
+      .select("role, status, permissions")
+      .eq("cinema_id", cinemaId)
+      .eq("user_id", userId)
+      .eq("status", "active")
+      .maybeSingle(),
+    supabase.from("cinemas").select("status").eq("id", cinemaId).maybeSingle(),
+  ]);
 
+  const isSuspended = cinema?.status === "suspended";
+  // A suspended cinema is forbidden for non-admin mutations at the database
+  // layer (0015_suspended_cinema_state_enforcement.sql) — showing an
+  // active invite/revoke control here would just be a guaranteed-to-fail
+  // form, so management capability is additionally gated on cinema state,
+  // not just role/permission.
   const canManage = canManageCinemaStaff(
     callerMembership as CinemaStaffMembership | null,
-  );
+  ) && !isSuspended;
 
   return (
     <main>
@@ -92,7 +101,10 @@ export default async function CinemaStaffPage({
       </table>
 
       {canManage && <InviteStaffForm cinemaId={cinemaId} />}
-      {!canManage && (
+      {isSuspended && (
+        <p role="alert">This cinema is suspended — staff management is read-only until it is reinstated.</p>
+      )}
+      {!canManage && !isSuspended && (
         <p>
           Only the cinema owner, or a manager granted the &quot;manage
           staff&quot; permission, can invite or revoke staff.

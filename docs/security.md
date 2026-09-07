@@ -34,16 +34,51 @@ documented Postgres/Supabase pattern, not a shortcut.
 ## Column/transition-level guards beyond RLS
 
 RLS controls *which rows* a role can touch, not *which columns* or *which
-state transitions*. Two places needed more than that
-(`supabase/migrations/0004_status_transition_guards.sql`):
+state transitions*. Several places need more than that:
 
 - A cinema owner can UPDATE their own cinema row (name, description,
-  location) but a trigger blocks them from also flipping `status` to
-  `approved` in the same statement — only `platform_admin` (or trusted
-  service-role code) may change `status`/`reviewed_by`/`reviewed_at`.
+  location, country_code, currency_code) but is blocked from touching
+  `status`, `reviewed_by`, `reviewed_at`, `rejection_reason`,
+  `primary_owner_id`, `id`, or `created_at` in the same statement — only
+  `platform_admin` (or trusted service-role code) may change those
+  (`supabase/migrations/0004_status_transition_guards.sql`, extended by
+  `0015_suspended_cinema_state_enforcement.sql`). Status changes are
+  additionally validated against a fixed four-edge legal-transition state
+  machine, and RLS itself now restricts cinema-row UPDATE access to the
+  owner or an admin (not "any active staff") — see
+  `docs/authorization-hardening.md` for the full authoritative cinema-state
+  policy and reasoning.
 - Cinema staff can UPDATE a booking to check it in, but a trigger blocks them
   from also rewriting `total_amount`, `stripe_payment_intent_id`, or any
   other financial field in that same UPDATE.
+
+## Suspended-cinema mutation blocking
+
+A `suspended` cinema is read-only for every non-admin user across its
+entire catalog and staff — screens, seats, cinema-movie associations,
+showtimes, and staff invite/accept/revoke/reinvite are all forbidden while
+suspended, enforced at the RLS/function/trigger layer
+(`0015_suspended_cinema_state_enforcement.sql`), not just in the UI or
+Server Actions. Read access to a suspended cinema's preserved data is
+unaffected. `platform_admin` retains full administration capability at all
+times. See `docs/authorization-hardening.md` for the complete policy table,
+every affected function/policy/trigger, and its verification (including a
+genuine local-Postgres migration + data-preservation + integration-test
+run).
+
+## Runtime privilege model
+
+`anon` and `authenticated` hold only the specific `SELECT`/`INSERT`/
+`UPDATE`/`DELETE` grants documented in
+`supabase/migrations/0007_roles_and_grants.sql` and
+`0013_catalog_permission_enforcement.sql` — RLS then narrows those grants
+per-row. `0016_runtime_privilege_hardening.sql` additionally revokes any
+broader default privileges (`TRUNCATE`, `TRIGGER`, `REFERENCES`, and
+anything else) a hosting platform's own project bootstrap may have granted
+before this repository's migrations ever ran, then re-affirms exactly the
+intended grants. `anon` never has any grant on `cinema_staff`, `users`,
+`audit_logs`, `bookings`, `payments`, `notifications`, `seat_holds`,
+`user_roles`, or `platform_policy_limits`.
 
 ## No self-escalation
 

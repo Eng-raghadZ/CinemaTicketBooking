@@ -40,6 +40,7 @@ export default async function CinemaShowtimesPage({
     { data: screensData },
     { data: cinemaMoviesData },
     { data: membership },
+    { data: cinema },
   ] = await Promise.all([
     supabase
       .from("showtimes")
@@ -58,6 +59,7 @@ export default async function CinemaShowtimesPage({
       .eq("user_id", userId)
       .eq("status", "active")
       .maybeSingle(),
+    supabase.from("cinemas").select("status").eq("id", cinemaId).maybeSingle(),
   ]);
 
   if (showtimesError) notFound();
@@ -66,13 +68,18 @@ export default async function CinemaShowtimesPage({
   const screens = (screensData ?? []) as ScreenOption[];
   const cinemaMovies = (cinemaMoviesData ?? []) as unknown as CinemaMovieOption[];
   const typedMembership = membership as CinemaStaffMembership | null;
+  const isSuspended = cinema?.status === "suspended";
   // Two separate permissions, matching
   // supabase/migrations/0013_catalog_permission_enforcement.sql exactly:
   // scheduling (create/delete) requires manage_showtimes, price edits
   // require manage_pricing. Neither implies the other, so both flags are
-  // computed independently and passed down separately.
-  const canManageShowtimes = hasCinemaPermission(typedMembership, "manage_showtimes");
-  const canManagePricing = hasCinemaPermission(typedMembership, "manage_pricing");
+  // computed independently and passed down separately. Both are
+  // additionally gated on the cinema not being suspended
+  // (0015_suspended_cinema_state_enforcement.sql) — a suspended cinema's
+  // showtimes are forbidden for non-admin mutation regardless of which
+  // permission is held.
+  const canManageShowtimes = hasCinemaPermission(typedMembership, "manage_showtimes") && !isSuspended;
+  const canManagePricing = hasCinemaPermission(typedMembership, "manage_pricing") && !isSuspended;
   const canManageAny = canManageShowtimes || canManagePricing;
 
   return (
@@ -141,6 +148,8 @@ export default async function CinemaShowtimesPage({
             />
           )}
         </section>
+      ) : isSuspended ? (
+        <p role="alert">This cinema is suspended — showtime management is read-only until it is reinstated.</p>
       ) : (
         <p>
           Only the cinema owner, or a manager granted the &quot;manage showtimes&quot;

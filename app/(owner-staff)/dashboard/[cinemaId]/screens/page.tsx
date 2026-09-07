@@ -21,7 +21,7 @@ export default async function CinemaScreensPage({
   const { userId } = await requireCinemaStaffOrRedirect(cinemaId);
 
   const supabase = await createServerSupabaseClient();
-  const [{ data, error }, { data: membership }] = await Promise.all([
+  const [{ data, error }, { data: membership }, { data: cinema }] = await Promise.all([
     supabase
       .from("screens")
       .select("id, name, layout_config, created_at")
@@ -34,14 +34,19 @@ export default async function CinemaScreensPage({
       .eq("user_id", userId)
       .eq("status", "active")
       .maybeSingle(),
+    supabase.from("cinemas").select("status").eq("id", cinemaId).maybeSingle(),
   ]);
 
   if (error) notFound();
   const screens = (data ?? []) as ScreenRow[];
+  const isSuspended = cinema?.status === "suspended";
   // Owner, or manager explicitly granted 'manage_screens' — matches
-  // supabase/migrations/0013_catalog_permission_enforcement.sql exactly, so
-  // this button never shows for someone whose write would be rejected by RLS.
-  const canManage = hasCinemaPermission(membership as CinemaStaffMembership | null, "manage_screens");
+  // supabase/migrations/0013_catalog_permission_enforcement.sql, plus the
+  // suspended-state gate added in
+  // 0015_suspended_cinema_state_enforcement.sql — so this button never
+  // shows for someone whose write would be rejected by RLS.
+  const canManage =
+    hasCinemaPermission(membership as CinemaStaffMembership | null, "manage_screens") && !isSuspended;
 
   return (
     <main>
@@ -77,6 +82,8 @@ export default async function CinemaScreensPage({
           <p>The seat grid is generated automatically from the rows/seats you choose.</p>
           <ScreenForm cinemaId={cinemaId} />
         </section>
+      ) : isSuspended ? (
+        <p role="alert">This cinema is suspended — screen management is read-only until it is reinstated.</p>
       ) : (
         <p>
           Only the cinema owner, or a manager granted the &quot;manage screens&quot; permission,
