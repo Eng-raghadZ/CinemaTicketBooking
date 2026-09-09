@@ -1,484 +1,381 @@
-# Multi-Cinema Booking Platform — Architecture & Roadmap (v3)
+# Moviera Multi-Cinema Booking Platform — Architecture & Roadmap (v3)
 
-*Updated after the verified completion and merge of Phase 0 and Phase 1. This version incorporates the implemented authentication routes, cinema onboarding workflow, fixed staff-permission vocabulary, database-level staff update protections, migrations `0009`–`0012`, and the current GitHub repository state.*
+*Status-aligned revision: 2026-09-09. Updated from the implemented repository and the comprehensive pre-Phase-4 audit.*
 
-This document is the architectural source of truth for the `Eng-raghadZ/CinemaTicketBooking` repository. It distinguishes between **implemented and verified behavior** and **planned future work** so that developers and AI coding agents do not mistake foundational schema or helper modules for completed user-facing features.
+> **Source-of-truth rule:** Before starting any phase or major workstream, fetch the latest GitHub state, switch to `main`, update with fast-forward only, confirm `main` matches `origin/main`, and record the exact commit SHA. This document guides the work but never replaces inspection of the current repository.
 
----
+## 0. Current Project Checkpoint
 
-## 0. Current Repository State
+### Audited baseline
 
-**Repository:** `https://github.com/Eng-raghadZ/CinemaTicketBooking`
+- Repository: `Eng-raghadZ/CinemaTicketBooking`
+- Branch: `main`
+- Audited commit: `e5feb881c77c7fac32101e59657a6723ec8e0959`
+- Audit date: 2026-09-09
+- Repository state at audit: clean; local `main` matched `origin/main`
+- Database migrations reviewed: 16
+- Verification recorded at the audited baseline: 159 unit tests and 173 integration tests passed; lint, typecheck, and production build passed.
 
-**Authoritative branch:** `main`
+### Delivery status
 
-**Verified implementation baseline:** merge commit `85c1a295166399cdaf4a2a16afdfd376f35488ac`
-
-| Phase | Status | Current meaning |
+| Workstream | Status | Meaning |
 |---|---|---|
-| Phase 0 — Foundations | **Complete and verified** | Core schema, RLS, authentication foundation, CI/CD, test infrastructure, and selected future-facing domain helpers are present. |
-| Phase 1 — Cinema Onboarding & Staff | **Complete, verified, and merged** | Authentication UI, cinema registration/review, and staff invitation/access management are operational. |
-| Phase 2 — Catalog Management | **Not implemented on `main`** | The database foundation may exist, but the application layer for movies, screens, seats, and showtimes is not present. |
-| Phase 3 onward | **Planned** | No phase should be treated as implemented merely because a supporting table, policy, or helper exists. |
+| Phase 0 — Foundations | Complete | Auth foundation, schema, RLS baseline, CI/CD, environments, cron scaffolding, policy/check-in helpers |
+| Phase 1 — Cinema Onboarding & Staff | Complete | Registration, admin review lifecycle, cinema-scoped staff roles and permissions |
+| Phase 2 — Catalog Management | Complete | Admin movie catalog, cinema/movie association, screens/seats, showtimes and pricing |
+| Phase 3 — Customer Browsing | Functionally complete and verified | Public cinema/movie/showtime discovery with approved-cinema filtering and tests |
+| Moviera homepage/UI | Separate presentation workstream | May integrate completed Phase 3 data; later features must remain honest placeholders |
+| Pre-Phase-4 security remediation | **Required next** | Blocking gate; Phase 4 must not begin until all critical/high findings are fixed and retested |
+| Phase 4 — Seat Selection & Booking Core | Blocked | Starts only after the security gate passes |
 
-Before starting any new phase, an implementation agent **must inspect the latest `main` branch and its full migration history**. Standalone ZIP files, old conversation artifacts, and earlier generated code are reference material only until reconciled with the current repository.
+### Current decision
+
+**The project is not ready to begin Phase 4 at the audited commit.** Phase 0–3 behavior is substantially implemented, but booking raises the integrity and financial impact of any authorization or concurrency weakness. The next engineering workstream is therefore **Pre-Phase-4 Security Remediation**, not new booking functionality.
+
+The core stack is unchanged from v1 (Next.js + Supabase Postgres/Auth/Realtime/Storage + Stripe Connect + Resend), because none of the new decisions require a different technology — they change the data model, authorization rules, and workflow logic, which this stack was already chosen to accommodate. Where a decision does change something structurally, it's called out explicitly below.
 
 ---
 
 ## 1. System Architecture (Updated)
 
-The infrastructure remains based on Next.js, Supabase, PostgreSQL, and Vercel. Authorization is intentionally enforced in layers rather than delegated to the UI.
+Unchanged from v1 at the infrastructure level. Two additions to the logical architecture:
 
-```text
-┌──────────────────────────────────────────────────────────────────────┐
-│                         Next.js 15 (Vercel)                         │
-│  Public site │ Auth │ Customer area │ Owner/Staff │ Platform Admin │
-│  Server Components │ Server Actions │ Route Handlers              │
-│  /lib/auth │ /lib/policy │ /lib/ticketing                         │
-└──────────────────────────────┬───────────────────────────────────────┘
-                               │
-                 ┌─────────────▼─────────────┐
-                 │      Supabase Platform    │
-                 │ PostgreSQL + Auth + RLS   │
-                 │ Realtime + Storage        │
-                 └─────────────┬─────────────┘
-                               │
-        ┌──────────────────────┼──────────────────────┐
-        │                      │                      │
-┌───────▼────────┐   ┌─────────▼────────┐   ┌────────▼────────┐
-│ Scheduled jobs │   │ Stripe Connect   │   │ Resend          │
-│ Hold expiry    │   │ Planned Phase 5  │   │ Planned Phase 7 │
-└────────────────┘   └──────────────────┘   └─────────────────┘
+- **Policy engine**: a small, isolated module (not a separate service) that evaluates cancellation/refund eligibility against layered policy data (global admin rules + per-cinema rules). Lives in `/lib/policy`.
+- **Ticketing & check-in**: QR generation on booking confirmation, and a staff-facing validation endpoint that atomically marks a ticket as checked-in exactly once.
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        Next.js (Vercel)                          │
+│  Public site │ Customer area │ Owner/Staff dashboard │ Admin     │
+│  Route Handlers / Server Actions = backend API layer              │
+│  /lib/policy (cancellation & refund rules)                        │
+│  /lib/ticketing (QR generation & check-in validation)             │
+└───────────────┬───────────────────────────┬──────────────────────┘
+                │                           │
+     ┌──────────▼─────────┐       ┌─────────▼──────────┐
+     │  Supabase Postgres   │       │   Stripe Connect      │
+     │  + Auth + RLS         │       │   (payments, fee-      │
+     │  + Storage             │       │   ready, idempotent)  │
+     │  + Realtime             │       └─────────────────────┘
+     └──────────┬───────────┘
+                │
+     ┌──────────▼───────────┐      ┌─────────────────┐
+     │  Scheduled jobs         │      │  Resend (email,   │
+     │  (expire seat holds)    │      │  notification       │
+     │                          │      │  abstraction layer) │
+     └────────────────────────┘      └─────────────────┘
 ```
 
-### Logical modules
+---
 
-- **Authentication and authorization:** Supabase Auth, server helpers, route guards, permission checks, RLS policies, and database triggers.
-- **Policy engine:** isolated cancellation/refund eligibility logic in `/lib/policy`. Its pure logic foundation exists; the full policy-management and refund workflow remains Phase 5 work.
-- **Ticketing and check-in:** atomic check-in helper foundation in `/lib/ticketing`. QR delivery and scanner UI remain Phase 6 work.
-- **Seat-hold expiry:** database support and a scheduled release endpoint exist. The complete customer seat-selection journey remains Phase 4 work.
+## 2. Updated Technology Stack
+
+No changes to the stack table from v1. One addition:
+
+| Layer | Choice |
+|---|---|
+| QR code generation | **`qrcode`** (npm, server-side generation) — signed payload, no new service needed |
+
+QR generation is a pure function (booking ID + a signed token → PNG/SVG), so it's implemented as a library call inside the existing Next.js backend rather than a new component. No compatibility analysis needed beyond "it's a Node package," which is why it wasn't in v1 — it wasn't yet clear tickets needed to be scannable.
 
 ---
 
-## 2. Technology Stack
+## 3. Database Architecture (Updated Schema)
 
-| Layer | Choice | Current status |
-|---|---|---|
-| Web framework | Next.js 15, App Router, TypeScript | Implemented |
-| UI rendering | React Server Components with client components where interaction is required | Implemented pattern |
-| Database | PostgreSQL through Supabase | Implemented |
-| ORM/schema mirror | Drizzle ORM | Implemented |
-| Authentication | Supabase Auth | Implemented |
-| Authorization | Middleware/guards + Server Actions/Route Handlers + PostgreSQL RLS/triggers | Implemented foundation and Phase 1 rules |
-| Validation | Zod | Implemented for Phase 1; extend per phase |
-| Realtime | Supabase Realtime | Planned for live seat state |
-| Object storage | Supabase Storage | Planned for posters and media |
-| Payments | Stripe + Stripe Connect | Planned for Phase 5 |
-| Email | Resend with a notification abstraction | Planned for Phase 7 |
-| QR generation | `qrcode`, server-side signed/unguessable ticket payload | Planned for Phase 6 |
-| Unit/integration tests | Vitest | Implemented |
-| End-to-end tests | Playwright | Planned |
-| Deployment | Vercel + Supabase + GitHub Actions | CI/CD foundation implemented |
-
----
-
-## 3. Database Architecture
-
-The SQL files in `/supabase/migrations` are the authoritative database definition. `/lib/db/schema.ts` must remain synchronized with them. Before adding or changing a table, inspect all migrations `0001`–`0012`; do not create duplicate tables simply because Phase 2 application code is absent.
+This is where most of the real change lives. Key updates from v1 are marked with **← updated**.
 
 ```sql
--- USERS AND PLATFORM ROLES
+-- USERS & STAFF
 users (id, email, created_at, ...)
-user_roles (user_id -> users, role: customer|cinema_owner|cinema_staff|platform_admin)
+user_roles (user_id → users, role: customer|cinema_owner|cinema_staff|platform_admin)
+  -- a user can only hold ONE platform-level role; cinema-scoped permissions live separately below
 
--- CINEMA-SCOPED AUTHORIZATION
-cinema_staff (
-  id, cinema_id -> cinemas, user_id -> users,
+cinema_staff (                                    -- ← NEW: multi-staff support
+  id, cinema_id → cinemas, user_id → users,
   role: owner|manager|staff,
-  permissions jsonb,
-  invited_by -> users,
-  status: invited|active|revoked,
+  permissions jsonb,                              -- granular overrides beyond the base role
+  invited_by → users, status: invited|active|revoked,
   created_at
 )
   -- UNIQUE (cinema_id, user_id)
-  -- owners, managers, and staff share one cinema-scoped authorization path
+  -- the cinema owner is simply the cinema_staff row with role='owner', created automatically
+  -- when the cinema is created — this means "owner" and "staff" share ONE authorization
+  -- code path instead of two, which is what makes future role types cheap to add.
 
 -- CINEMAS
 cinemas (
-  id, primary_owner_id -> users,
-  name, description, location,
-  status: pending_review|approved|suspended|rejected,
-  reviewed_by -> users, reviewed_at, rejection_reason,
-  country_code, currency_code,
+  id, primary_owner_id → users, name, description, location,
+  status: pending_review|approved|suspended|rejected,   -- ← updated: explicit approval workflow
+  reviewed_by → users, reviewed_at, rejection_reason,
+  country_code, currency_code default 'XXX',            -- ← NEW: present now, single value enforced
+                                                          --   in app logic, not schema — see Section 5
   created_at
 )
 
--- CATALOG FOUNDATION
-screens (id, cinema_id -> cinemas, name, layout_config jsonb)
-seats (id, screen_id -> screens, row, number, seat_type)
+screens (id, cinema_id → cinemas, name, layout_config jsonb)
+seats (id, screen_id → screens, row, number, seat_type)
+
+-- MOVIES (platform-level, not duplicated per cinema)             -- unchanged from v1, confirmed correct
 movies (id, title, description, poster_url, duration_minutes, rating, ...)
-cinema_movies (cinema_id -> cinemas, movie_id -> movies)
-showtimes (id, cinema_id, screen_id, movie_id, starts_at, base_price, currency_code)
+cinema_movies (cinema_id → cinemas, movie_id → movies)             -- which movies a cinema shows
+showtimes (id, cinema_id, screen_id, movie_id, starts_at timestamptz, base_price, currency_code)
 
--- BOOKING FOUNDATION
-seat_holds (id, showtime_id, seat_id, user_id, expires_at, status)
+-- BOOKING & SEAT HOLDS
+seat_holds (
+  id, showtime_id, seat_id, user_id, expires_at,
+  status: held|booked|released
+)
+  -- UNIQUE (showtime_id, seat_id) WHERE status IN ('held','booked')  -- double-booking prevention
+
 bookings (
-  id, user_id, cinema_id, showtime_id, status,
-  stripe_payment_intent_id, idempotency_key,
-  total_amount, platform_fee_amount, currency_code,
-  ticket_reference, checked_in_at, checked_in_by,
+  id, user_id, cinema_id, showtime_id,
+  status: pending|confirmed|cancelled|refunded|expired|checked_in,  -- ← updated status set
+  stripe_payment_intent_id, idempotency_key,                        -- ← NEW: idempotency_key
+  total_amount, platform_fee_amount default 0,                      -- ← NEW: commission-ready
+  currency_code,
+  ticket_reference uuid,                                            -- ← NEW: unique, QR-encoded
+  checked_in_at, checked_in_by → cinema_staff,                      -- ← NEW: check-in tracking
   created_at
 )
-booking_seats (booking_id -> bookings, seat_id -> seats)
+booking_seats (booking_id → bookings, seat_id → seats)
 
--- POLICY, PAYMENTS, NOTIFICATIONS, AND AUDIT FOUNDATION
-platform_policy_limits (...)
-cinema_cancellation_policies (...)
-payments (...)
-notifications (...)
-audit_logs (...)
+-- POLICY ENGINE                                                    -- ← NEW section
+platform_policy_limits (
+  id, min_cancellation_window_hours, max_refund_percentage, ...     -- admin-defined ceiling/floor
+)
+cinema_cancellation_policies (
+  cinema_id → cinemas, cancellation_window_hours, refund_percentage,
+  -- validated at write-time (app layer + a Postgres CHECK/trigger) to stay within
+  -- platform_policy_limits — a cinema cannot save a policy more lenient than the platform allows
+)
+
+-- PAYMENTS
+payments (id, booking_id, stripe_object_id, amount, platform_fee_amount, status)
+
+-- NOTIFICATIONS                                                    -- ← NEW: abstraction, not just email
+notifications (
+  id, user_id, type: booking_confirmed|payment_confirmed|booking_cancelled|
+                      refund_confirmed|ticket_delivered|booking_changed,
+  channel: email,                       -- enum, extendable to sms|push later without a schema rewrite
+  status: pending|sent|failed, sent_at
+)
+
+audit_logs (id, actor_id, action, entity, entity_id, metadata jsonb, created_at)
 ```
 
-### Important implementation distinction
+### Why this shape supports future requirements without redesign
 
-The presence of a table or foundational helper does **not** complete its roadmap phase. For example:
-
-- Catalog tables do not mean Catalog Management is complete.
-- `seat_holds` and the expiry endpoint do not mean seat selection is complete.
-- payment columns do not mean Stripe is integrated.
-- ticket/check-in fields do not mean QR tickets and scanner UI are complete.
-- notification records do not mean Resend delivery is implemented.
-
-### Phase 1 security migrations
-
-The current migration history includes the following post-foundation refinements:
-
-| Migration | Purpose |
-|---|---|
-| `0009_staff_profile_visibility.sql` | Allows authorized cinema staff managers to read the basic staff records required by the staff-management interface. |
-| `0010_cinema_staff_update_guards.sql` | Adds database-level update protections for `cinema_staff`, preventing identity changes, cinema reassignment, owner mutation, and unauthorized privilege escalation. |
-| `0011_invited_staff_cinema_visibility.sql` | Allows an invited user to view the cinema associated with their pending invitation. |
-| `0012_allow_revoked_staff_reinvite.sql` | Allows a revoked member to be re-invited with a newly selected role and permission set while retaining the protections introduced by migration `0010`. |
+- **Commission-ready payments (Decision 1):** `platform_fee_amount` exists and defaults to `0` today. Turning on commission later is a configuration change (set a percentage, populate this field, pass `application_fee_amount` to Stripe) — not a schema or architecture change.
+- **Policy engine (Decision 2):** two-tier table design (`platform_policy_limits` + `cinema_cancellation_policies`) means the admin ceiling and owner-configured policy are separate rows, validated against each other, rather than one flat "policy" field that would need restructuring to add the admin-limits concept.
+- **Cinema onboarding (Decision 3):** `status` on `cinemas` already models `pending_review → approved/rejected`, plus `suspended` for post-approval action. Public browsing/booking queries simply filter `WHERE status = 'approved'` — enforced by RLS, not just application filtering.
+- **Multi-staff (Decision 4):** `cinema_staff` is the single authorization join table for *every* human who can touch a cinema, including the owner. This avoids a separate "is this user the owner OR a staff member" branch in every query — one table, one RLS policy pattern, and adding a new role (e.g., "read-only accountant") later is one enum value plus a permissions check, not a new subsystem.
+- **Geographic/currency scope (Decision 5):** `currency_code` exists on `cinemas`, `showtimes`, `bookings` now, hardcoded to one value across the app (single default currency, validated in app logic). Multi-currency later means removing that app-level constraint and wiring Stripe's multi-currency support — the columns already exist, so it's not a migration that touches historical data.
+- **QR/check-in (Decision 6):** `ticket_reference` is a unique, unguessable UUID separate from the booking's primary key (so the QR payload doesn't leak sequential booking IDs). Check-in is `UPDATE bookings SET status='checked_in', checked_in_at=now() WHERE ticket_reference=$1 AND status='confirmed'` — a single atomic conditional update guarantees a ticket can only be checked in once, even with simultaneous scan attempts, without needing a separate lock.
+- **Notifications (Decision 12):** modeled as records with a `channel` enum, not just "send an email" function calls scattered through the codebase. Adding SMS/push later means adding an enum value and a new sender implementation behind the same interface — the booking/payment code that *triggers* notifications doesn't change.
+- **Future extensibility (Decision 14):** discount codes, promotions, loyalty, and reviews are deliberately **not** modeled yet — adding empty tables now for unbuilt features would be premature complexity you explicitly asked me to avoid. The schema doesn't preclude them: a `discount_codes` table applied at booking time, or a `reviews` table keyed to `movie_id`, would each be additive, isolated changes when actually needed.
+- **Movie catalog governance (Section 11):** `movies` is admin-write-only (enforced by RLS, not just UI hiding); `cinema_movies` is the only table cinema owners can write to for catalog purposes. This keeps the catalog free of duplicate/inconsistent titles across cinemas by construction, and if owner-submission is ever wanted later, it's a new `movie_submissions` table feeding an admin review step — additive, not a change to existing tables.
 
 ---
 
-## 4. Authentication and Authorization Model
+## 4. Authorization Model (Updated)
 
-### Platform and cinema-scoped roles
+**Roles, precisely defined:**
 
 | Role | Scope |
 |---|---|
-| `customer` | Own profile, bookings, and tickets only. Customer functionality is planned for later phases. |
-| `staff` in `cinema_staff` | Limited access to one cinema according to the fixed role scope and allowed operations. |
-| `manager` in `cinema_staff` | Broader cinema management capabilities according to assigned permissions. |
-| `owner` in `cinema_staff` | Full control of the associated cinema and staff-management authority; a user may own multiple cinemas. |
-| `platform_admin` | Platform-wide cinema review and future platform-management capabilities. |
+| `customer` | Own bookings/account only |
+| `cinema_staff` (role=`staff`) | Limited permissions on one specific cinema (e.g., view/manage bookings, check in tickets) per `permissions` jsonb |
+| `cinema_staff` (role=`manager`) | Broader permissions on one specific cinema (showtimes, pricing, screens) but not ownership actions (can't delete cinema, can't invite/revoke other staff unless explicitly granted) |
+| `cinema_staff` (role=`owner`) | Full permissions on cinema(s) they own; can invite/revoke staff; can own multiple cinemas via multiple `cinema_staff` rows |
+| `platform_admin` | Platform-wide: approve/suspend cinemas, manage all users, set global policy limits, view all audit logs |
 
-### Fixed permission vocabulary
+**Enforcement, still layered (unchanged principle from v1, now with staff granularity):**
+1. Middleware: session + base role check.
+2. Route Handler: re-checks role **and** looks up the caller's `cinema_staff` row for the specific `cinema_id` in the request — a manager for Cinema A gets rejected server-side if they try to touch Cinema B, regardless of what the UI shows them.
+3. RLS: policies join through `cinema_staff` so that even a direct database query is scoped to cinemas the user has an active (`status='active'`) staff row for. This is the change from v1's simpler "owner_id = auth.uid()" policy — RLS now checks staff membership, which is what makes multi-staff and multi-cinema ownership both work under one consistent rule.
 
-`permissions` is stored as JSONB for extensibility, but it is **not free-form JSON**. The application must accept only the documented keys defined by `STAFF_PERMISSION_KEYS`:
+---
 
-```text
-manage_staff
-manage_showtimes
-manage_pricing
-manage_screens
-view_bookings
-manage_bookings
-check_in_tickets
+## 5. Payment Architecture (Updated)
+
+Flow is the same five webhook-driven steps as v1, with two additions:
+
+- **Idempotency**: every PaymentIntent creation call includes an `idempotency_key` (generated client-side per checkout attempt, stored on the `bookings` row before the Stripe call). A retried request with the same key returns Stripe's original result instead of creating a second charge — this is what makes "double-click the pay button" and "network retry" safe by construction, per your requirement.
+- **Commission-ready, commission-off**: `application_fee_amount` is passed to Stripe as `0` (or omitted) for now. Nothing about the PaymentIntent creation code changes when a commission is introduced later — only the fee-calculation function's output changes, from a constant zero to a real percentage lookup.
+
+Refund flow now runs through the policy engine: on a cancellation request, the system evaluates `cinema_cancellation_policies` (bounded by `platform_policy_limits`) against the showtime's start time to determine eligibility and refund percentage automatically — never a manual/ad-hoc decision, and never client-asserted.
+
+---
+
+## 6. Project Structure (Updated)
+
 ```
-
-Rules:
-
-- Unknown permission keys must be rejected by validation.
-- Permission checks must never trust client-supplied values.
-- The `staff` role has a fixed limited scope; manager permissions may be selected only from the vocabulary above.
-- An `owner` must not be created through the ordinary staff invitation/update path.
-- Expanding the vocabulary requires validation, authorization, documentation, and test updates in the same change.
-
-### Layered enforcement
-
-1. **Middleware/session boundary:** blocks unauthenticated access and performs coarse route-level checks.
-2. **Server boundary:** Server Actions and Route Handlers re-check the authenticated user, target cinema membership, membership status, role, and required permission.
-3. **Database boundary:** RLS scopes reads/writes to the correct user and cinema; triggers protect sensitive staff fields and status transitions.
-
-UI hiding is convenience only and is never considered authorization.
-
-### Self-escalation gap — resolved
-
-The earlier `cinema_staff` self-escalation risk is considered resolved by migration `0010` and its `enforce_cinema_staff_update_scope` trigger, together with the constrained re-invitation flow in migration `0012`.
-
-Protected behavior includes:
-
-- ordinary users cannot promote a membership to `owner`;
-- staff cannot raise their own role or permissions through direct updates;
-- membership `user_id` and `cinema_id` cannot be reassigned;
-- owner memberships cannot be altered by the ordinary staff update path;
-- service-role/platform-admin operations remain explicitly privileged rather than accidentally available through normal RLS writes.
-
----
-
-## 5. Implemented Phase 1 Workflows
-
-### Authentication
-
-- Login and signup pages.
-- Auth callback handling.
-- Sign-out flow.
-- Safe internal redirects through `safeInternalRedirectPath` to prevent open redirects.
-- Signup callback corrected to `/callback`.
-
-### Cinema onboarding
-
-1. An authenticated owner submits a cinema registration.
-2. The cinema is created as `pending_review` and is not publicly available.
-3. The owner receives the corresponding owner membership through the unified `cinema_staff` model.
-4. A platform admin reviews the cinema.
-5. Valid transitions are enforced server-side:
-   - `pending_review -> approved`
-   - `pending_review -> rejected`
-   - `approved -> suspended`
-   - `suspended -> approved`
-6. Administrative actions create audit-log records.
-
-### Staff lifecycle
-
-1. An authorized owner/manager invites an existing user as `manager` or `staff`.
-2. Only the intended user can accept the invitation.
-3. Active access remains limited to the associated cinema.
-4. A non-owner membership may be revoked.
-5. A revoked member may be re-invited with a new permitted role/permission selection.
-6. Database triggers prevent owner mutation and privilege escalation throughout the lifecycle.
-
----
-
-## 6. Payment and Policy Architecture (Planned)
-
-Payment remains planned for Phase 5.
-
-- Each checkout attempt will use an idempotency key stored before Stripe PaymentIntent creation.
-- Stripe retries with the same key must not create duplicate charges or bookings.
-- `platform_fee_amount` keeps the schema commission-ready; commission remains off until explicitly enabled.
-- Refund eligibility will be evaluated by the policy engine using platform limits and cinema-specific policies.
-- Policy constraints must be enforced at both the application and database boundary.
-
-Existing cancellation-policy code is foundational and tested; it does not represent a complete payment/refund workflow.
-
----
-
-## 7. Project Structure
-
-The structure below marks implemented areas and planned destinations.
-
-```text
 /app
-  /(auth)/                                      # IMPLEMENTED — Phase 1
-      login/
-      signup/
-      callback/
-      sign-out/
-  /(owner-staff)/dashboard/                     # IMPLEMENTED — Phase 1 foundation
-      page.tsx
-      register/
-      [cinemaId]/staff/
-      [cinemaId]/screens/                       # PLANNED — Phase 2
-      [cinemaId]/showtimes/                     # PLANNED — Phase 2
-      [cinemaId]/bookings/                      # PLANNED — later phase
-      [cinemaId]/policy/                        # PLANNED — Phase 5
-      [cinemaId]/check-in/                      # PLANNED — Phase 6
+  /(public)/movies, /cinemas, /showtimes
+  /(customer)/account, /bookings, /tickets/[reference]
+  /(owner-staff)/dashboard/[cinemaId]/
+      screens, showtimes, bookings, staff, policy, check-in     ← staff invite UI + QR scanner page
   /(admin)/dashboard/
-      cinemas/                                  # IMPLEMENTED — Phase 1
-      movies/                                   # PLANNED — Phase 2
-      owners/, users/, policy-limits/, audit-logs/, stats/  # PLANNED
-  /(public)/movies, cinemas, showtimes           # PLANNED — Phase 3
-  /(customer)/account, bookings, tickets/        # PLANNED — Phases 3–6
-  /api/cron/release-expired-seat-holds/          # IMPLEMENTED foundation
-  /api/health/                                   # IMPLEMENTED
-  /api/webhooks/stripe/                          # PLANNED — Phase 5
-  /api/tickets/[reference]/check-in/             # PLANNED — Phase 6
-
+      cinemas, owners, users, policy-limits, audit-logs, stats
+  /api/webhooks/stripe
+  /api/tickets/[reference]/check-in                              ← NEW: atomic check-in endpoint
 /lib
-  /actions                                      # Phase 1 cinema/staff actions implemented
-  /auth                                         # Supabase helpers, guards, redirects, permissions
-  /db                                           # Drizzle schema, client, migration runner
-  /validation                                   # Phase 1 Zod schemas; extend per phase
-  /policy                                       # Foundational cancellation logic
-  /ticketing                                    # Foundational atomic check-in logic
-  /payments                                     # PLANNED — Phase 5
-  /notifications                                # PLANNED — Phase 7
-
+  /db            ← Drizzle schema + client
+  /auth          ← Supabase auth helpers, cinema_staff-aware guards
+  /payments      ← Stripe client, idempotency handling, fee calculation
+  /policy        ← NEW: cancellation/refund eligibility engine
+  /ticketing     ← NEW: QR generation + check-in validation
+  /notifications ← NEW: channel-abstracted sender (email now, sms/push later)
+  /validation    ← Zod schemas
 /supabase
-  /migrations                                   # SQL source of truth, currently 0001–0012
-  /functions                                    # Scheduled/background database functions
-
+  /migrations
+  /functions     ← seat-hold sweeper
 /tests
-  /unit                                         # IMPLEMENTED and passing
-  /integration                                  # IMPLEMENTED and passing against isolated test DB
-  /e2e                                          # PLANNED
-
-/docs
-  environments.md
-  security.md
-  phase1-cinema-onboarding-and-staff.md
-  architecture-plan.md                          # This document should be committed here
+  /unit
+  /e2e
 ```
 
 ---
 
-## 8. Development Roadmap
+## 7. Development Roadmap (Status-Aligned)
 
-### Phase 0 — Foundations — COMPLETE
+**Phase 0 — Foundations — COMPLETE**
+Repo, CI/CD, environments, core schema + RLS, base auth, seat-hold expiry endpoint, cancellation helper, and check-in helper.
 
-- Repository, dependencies, environments, migrations, core schema, RLS, base authentication helpers, CI/CD, and isolated integration-test infrastructure.
-- Foundational seat-hold, cancellation-policy, and ticket-check-in helpers were added for later phases.
-- **Verification:** unit tests, integration tests, lint, typecheck, build, and GitHub Actions passed.
+**Phase 1 — Cinema Onboarding & Staff — COMPLETE**
+- Cinema registration flow (owner-submitted), admin review queue, approve/reject/suspend actions.
+- `cinema_staff` model: invite flow, role assignment, permission checks in middleware + RLS.
+- *Exit criteria: an owner can register a cinema, it stays invisible until admin-approved, and an invited staff member's access is correctly scoped and cannot touch another cinema.*
 
-### Phase 1 — Cinema Onboarding & Staff — COMPLETE
+**Phase 2 — Catalog Management — COMPLETE**
+- Platform-level movie management (admin-only creation of the master catalog — see Section 11), cinema-to-movie association, screens/seats configuration, showtimes.
+- *Depends on Phase 1.*
 
-- Authentication UI and callback/sign-out flows.
-- Cinema registration and admin review workflow.
-- Staff invitation, acceptance, revocation, and constrained re-invitation.
-- Fixed permission vocabulary and server-side permission checks.
-- RLS visibility refinements and database-level update protections.
-- Audit logging for administrative cinema operations.
-- **Exit criteria satisfied:** an owner can register a cinema; it remains unavailable until approval; invited staff access is cinema-scoped; cross-cinema access and self-escalation are blocked.
-- **Verification:** `44` unit tests and `32` integration tests passed during the Phase 1 sign-off; lint, typecheck, build, and four GitHub Actions checks passed.
+**Phase 3 — Customer Browsing — FUNCTIONALLY COMPLETE**
+- Discovery, search/filter, SSR showtime pages — filtered to `status='approved'` cinemas only.
+- *Depends on Phase 2.*
 
-### Phase 2 — Catalog Management — NEXT, NOT IMPLEMENTED
+**Mandatory Gate — Pre-Phase-4 Security Remediation — NEXT**
+- Upgrade Next.js and any related dependencies to versions that resolve the audited critical advisories without applying uncontrolled breaking upgrades.
+- Remove direct authenticated-client mutation privileges from foundational booking tables. Booking and seat-hold writes must go through narrowly scoped, server-controlled transactional operations.
+- Enforce seat/showtime/screen/cinema consistency at the database boundary; do not trust related IDs supplied by the client.
+- Redesign the maximum-eight-seats rule so the database derives and enforces it safely under concurrency; a client-controlled grouping/session value is not authoritative.
+- Re-audit all booking-related RLS policies, grants, security-definer functions, triggers, Realtime exposure, cron authorization, and service-role usage after remediation.
+- Add regression tests that demonstrate each finding is no longer exploitable, including concurrent transactions and cross-cinema attempts.
+- Re-run the complete validation suite on a fresh isolated database and record evidence in the remediation PR.
 
-- Admin-only master movie catalog CRUD.
-- Cinema-to-movie association management.
-- Screen creation and safe seat-grid/layout generation.
-- Showtime creation, editing, and removal.
-- Conflict checks, validation, authorization, RLS/constraints, UI, and tests.
-- **Dependency:** verified Phase 1 baseline.
+*Gate exit criteria: zero unresolved critical/high findings affecting the Phase 4 trust boundary; dependency audit reviewed; fresh migrations succeed; unit, integration/RLS, concurrency, lint, typecheck, build, and focused manual security tests pass; the remediation PR is reviewed and merged into `main`; updated `main` is re-audited before Phase 4 begins.*
 
-### Phase 3 — Customer Browsing
+**Phase 4 — Seat Selection & Booking Core — BLOCKED BY SECURITY GATE**
+- Server-authoritative availability query and seat map.
+- Atomic hold command with a 10-minute expiry, authenticated ownership, and no cross-showtime/cross-cinema seat injection.
+- Database-enforced uniqueness for active held/booked seats and transaction-safe enforcement of the eight-seat maximum.
+- Safe release/expiry behavior and narrowly scoped Realtime subscriptions that expose no private booking or user data.
+- Booking draft creation and ownership checks; totals are calculated from trusted showtime/pricing data, never accepted from the client.
+- *Depends on Phase 3 and successful completion of the mandatory security gate.*
+- *Exit criteria: concurrent requests cannot double-book or bypass the seat cap; users cannot mutate another user's holds/bookings; invalid relational combinations fail at the database boundary; expiry and retry behavior are deterministic; complete automated and manual verification passes.*
 
-- Public cinema/movie discovery, search/filter, and SSR showtime pages.
-- Only approved cinemas and valid public showtimes may be returned.
-- **Dependency:** Phase 2.
+**Phase 5 — Payments & Policy Engine**
+- Stripe Connect onboarding, idempotent PaymentIntent flow, webhooks, the cancellation/refund policy engine (global limits + per-cinema policy + automatic eligibility evaluation), refund execution.
+- *Depends on Phase 4.*
+- Payment amounts, currency, cinema destination, fees, and refund eligibility must be calculated server-side. Webhook signatures, event idempotency, ordering, replay handling, and transactional booking-state transitions are mandatory exit criteria.
 
-### Phase 4 — Seat Selection & Booking Core
+**Phase 6 — Ticketing & Check-in**
+- QR ticket generation on confirmation, customer-facing ticket view, staff check-in scanner UI, atomic single-use validation.
+- *Depends on Phase 5 (needs confirmed bookings to ticket).*
 
-- Realtime seat map, atomic holds, expiry/release behavior, booking creation, and maximum-seat enforcement.
-- **Dependency:** Phase 3.
+**Phase 7 — Notifications**
+- Notification abstraction + Resend email implementation for all required events (confirmation, payment, cancellation, refund, ticket delivery, booking changes).
+- *Can run in parallel with Phase 6, both depend on Phase 5.*
 
-### Phase 5 — Payments & Policy Engine
+**Phase 8 — Admin Platform Tools**
+- Full admin dashboard: owners/staff/cinemas management, global policy-limit configuration, platform-wide stats, audit log viewer.
+- *Depends on Phases 1, 5, 6 having real data to manage/report on.*
 
-- Stripe Connect onboarding, idempotent PaymentIntents, webhooks, platform fees, policy configuration, cancellation evaluation, and refunds.
-- **Dependency:** Phase 4.
+**Phase 9 — Hardening**
+- Rate limiting, security review, accessibility audit, load test specifically on seat-hold and check-in concurrency paths, legal pages.
 
-### Phase 6 — Ticketing & Check-in
+> Phase 9 is a final hardening pass, not a reason to defer known security defects. Security gates are required at every phase boundary, especially before booking and payments.
 
-- Signed/unguessable QR tickets, customer ticket view, scanner UI, and atomic single-use validation.
-- **Dependency:** confirmed paid bookings from Phase 5.
+**Phase 10 — Production Launch**
 
-### Phase 7 — Notifications
-
-- Notification abstraction and Resend implementation for booking, payment, cancellation, refund, ticket, and booking-change events.
-- **Dependency:** Phase 5; may progress alongside Phase 6 where safe.
-
-### Phase 8 — Admin Platform Tools
-
-- Full user/owner/staff management, policy limits, audit viewer, and platform statistics.
-
-### Phase 9 — Hardening
-
-- Rate limiting, dependency/security review, accessibility audit, concurrency/load testing, observability, and legal pages.
-
-### Phase 10 — Production Launch
-
-- Production configuration, migration verification, monitoring, rollback plan, smoke tests, and release approval.
-
-### Phase 11 — Post-launch
-
-- Performance refinement, backup/restore drills, analytics improvements, and evidence-based evaluation of promotions, loyalty, reviews, and multi-currency.
+**Phase 11 — Post-launch**
+- Statistics refinement, performance tuning, backup/DR drills, groundwork for future features (discount codes, multi-currency) evaluated against real usage data rather than speculatively.
 
 ---
 
-## 9. Testing Strategy
+## 8. Testing Strategy (Updated additions)
 
-Every phase must add tests for its own behavior and preserve all earlier passing checks.
-
-- **Unit tests:** validation, permission helpers, pure policy functions, and business rules.
-- **Integration tests:** PostgreSQL constraints, RLS isolation, triggers, status transitions, and concurrency-sensitive database behavior.
-- **Security tests:** cross-cinema denial, unauthorized role/permission changes, owner-row protection, invitation ownership, and service-role boundaries.
-- **E2E tests:** complete role-based workflows once the associated UI phase exists.
-- **Build gates:** `npm test`, `npm run test:integration`, `npm run lint`, `npm run typecheck`, and `npm run build`.
-
-Integration tests must run only against an explicitly approved isolated database named `cinema_platform_test` or `cinema_platform_ci`. The test helper must refuse destructive execution against development, staging, or production databases.
-
-The dedicated `app_test` role must remain non-superuser, `NOBYPASSRLS`, and suitable for testing real RLS behavior through the expected Supabase roles.
+- **Staff authorization tests**: verify a `manager`/`staff` role genuinely cannot exceed granted permissions, and cannot access a different cinema even with a valid session.
+- **Policy engine unit tests**: table-driven tests covering "cinema policy more lenient than platform limit" (should be rejected at write-time), boundary conditions on cancellation windows.
+- **Check-in concurrency test**: simulate two simultaneous scans of the same QR code; exactly one must succeed.
+- **Idempotency test**: fire the same payment request twice with the same idempotency key; verify exactly one booking/charge results.
+- Everything from v1 (RLS integration tests, seat-hold race tests, Stripe test-mode payment matrix, Playwright E2E journeys) still applies.
 
 ---
 
-## 10. Deployment and Migration Strategy
+## 9. Deployment Strategy
 
-- Vercel handles application deployment from GitHub.
-- GitHub Actions validates unit tests, integration tests, lint/typecheck, and build.
-- Database migrations are applied in filename order from `/supabase/migrations`.
-- Staging migrations run against the staging environment.
-- Production migrations require the protected production workflow/release path and explicit approval.
-- Secrets belong only in local environment files, GitHub environment secrets, Vercel, or Supabase configuration. They must never be committed.
-- Schema changes must be additive and backward-compatible where practical; destructive changes require an explicit migration and rollback/data-preservation plan.
+Unchanged from v1.
 
 ---
 
-## 11. Confirmed Defaults and Governance
+## 10. Security Findings, Risks, and Engine Guardrails
 
-1. **Seat-hold expiry:** 10 minutes.
-2. **Maximum seats per booking:** 8, enforced server-side when Phase 4 is implemented.
-3. **Movie creation:** platform-admin only. Cinema owners select from the master catalog through `cinema_movies`; they do not create or edit master movie rows.
-4. **Cinema visibility:** only approved cinemas are publicly discoverable/bookable.
-5. **Permission vocabulary:** limited to the seven documented `STAFF_PERMISSION_KEYS` until a reviewed change extends it.
-6. **Owner creation:** owner memberships are created only through the trusted cinema ownership flow, never through ordinary staff invitation or update operations.
-7. **Currency scope:** the application begins with one configured currency while retaining currency columns for future extension.
-8. **Commission:** schema-ready but disabled until the payment phase explicitly defines and verifies it.
+### Blocking findings from the 2026-09-09 pre-Phase-4 audit
 
----
+1. **Critical dependency exposure:** the installed Next.js baseline has reported critical vulnerabilities. Pin and upgrade deliberately, inspect the changelog, regenerate the lockfile through the package manager, and rerun the full suite. Never use a blind force-upgrade as proof of remediation.
+2. **Over-broad booking-table privileges:** authenticated users have direct PostgREST insert/update capability over foundational booking tables. RLS alone must not turn an untrusted client into the booking transaction coordinator. Revoke broad writes and expose minimal server-owned/RPC operations with fixed inputs and explicit authorization.
+3. **Missing relational integrity checks:** current protections do not fully prove that a selected seat belongs to the showtime's screen or that the showtime/screen/cinema combination is consistent. Enforce these relationships in database constraints or carefully reviewed transactional functions.
+4. **Bypassable and race-prone seat cap:** the maximum-eight-seats rule is influenced by client-controlled data and its trigger approach is unsafe under concurrent requests. The authoritative grouping must be server/database derived, locked consistently, and tested with simultaneous transactions.
 
-## 12. Known Risks and Required Controls
+These findings are release blockers, not backlog polish. The implementing engine must first inspect the complete audit and current SQL/code; this summary must not be treated as a substitute for the exact evidence and affected objects in the audit.
 
-- **Permission drift:** keep the fixed permission vocabulary synchronized across validation, authorization helpers, UI, documentation, and tests.
-- **Schema/application drift:** treat SQL migrations as authoritative and keep Drizzle schema synchronized.
-- **Phase-status confusion:** do not label a phase complete because foundational tables or helpers exist.
-- **Cross-cinema access:** every cinema-scoped server operation must verify the target membership and rely on RLS as the final boundary.
-- **Policy bypass:** future cinema policies must be constrained at database write time as well as in application validation.
-- **Seat and check-in races:** use atomic database operations and concurrency tests; UI checks alone are insufficient.
-- **Payment duplication:** use Stripe idempotency and webhook-driven state transitions.
-- **QR exposure:** use an unguessable ticket reference and authenticate check-in staff against the booking's cinema.
-- **Currency inconsistency:** use one central configuration value rather than scattered literals.
+### Non-negotiable implementation guardrails
 
----
+- Never trust client-supplied `user_id`, `cinema_id`, price, currency, fee, role, permission, booking status, or ownership fields.
+- Do not solve database authorization defects only by hiding UI controls or adding middleware. Preserve layered enforcement: server guard + least-privilege grants + RLS + relational constraints/transactional functions.
+- Security-definer functions must use a safe fixed `search_path`, explicit schema qualification, least privilege, and revoked public execution unless intentionally granted.
+- Service-role credentials stay server-only and must not be used to bypass tenant checks in ordinary application flows.
+- Realtime publication/policies must expose only the minimum seat-availability state needed by the client—not user IDs, private holds, booking records, or payment data.
+- Cron and webhook endpoints require strong authentication/signature verification, replay resistance where applicable, safe failure behavior, and no secrets in logs.
+- Every tenant-scoped mutation must include a negative cross-cinema/IDOR test and every state transition must reject invalid prior states.
+- Integration tests remain restricted to the approved isolated databases `cinema_platform_test` and `cinema_platform_ci`; never point destructive tests at development, staging, or production.
+- Do not weaken tests, RLS, constraints, or grants merely to make a new feature pass.
 
-## 13. Instructions for the Next Implementation Agent
+### Continuing architectural risks
 
-Before beginning Phase 2 or any later phase:
-
-1. Fetch and inspect the latest `main` branch and full repository tree.
-2. Read this document, `docs/security.md`, `docs/environments.md`, and the Phase 1 implementation document.
-3. Inspect `/supabase/migrations/0001` through `0012` and `/lib/db/schema.ts` before proposing schema changes.
-4. Confirm that the worktree is clean and create a dedicated feature branch from current `main`.
-5. Treat any older Phase 2 ZIP/artifact as reference only; reconcile it file-by-file with the current security model instead of merging it blindly.
-6. Preserve migrations and verified Phase 0/1 behavior unless a required change is documented and tested.
-7. Implement the full phase slice: database changes, RLS/constraints, validation, server operations, UI, tests, and documentation.
-8. Do not start the following phase until all required checks pass and the current phase is reviewed and merged.
-
-Recommended branch start:
-
-```bash
-git switch main
-git pull --ff-only origin main
-git switch -c phase-2/catalog-management
-```
+- **Permission model complexity**: `permissions jsonb` on `cinema_staff` gives flexibility but needs disciplined validation (a fixed, documented set of permission keys) to avoid becoming an unauditable free-for-all — recommend starting with a small fixed permission set per role rather than fully free-form JSON, and only widening it if a real need appears.
+- **Policy engine edge cases**: cinema policy validation against platform limits must be enforced at write-time (not just documented) — a missing DB-level CHECK/trigger would let bad data in if application validation is ever bypassed.
+- **QR ticket security**: `ticket_reference` must be unguessable (UUID, not sequential) and check-in endpoints must be authenticated as cinema staff for that specific cinema — an unauthenticated or cross-cinema check-in endpoint would be a real fraud vector.
+- **Currency hardcoding discipline**: keeping "single currency" enforced in application logic (not schema) means a future developer could accidentally introduce multi-currency inconsistently; worth a single well-documented app-level constant/config rather than scattered assumptions.
 
 ---
 
-## 14. Immediate Next Step
+## 11. Confirmed Defaults
 
-Commit this updated architecture document as `docs/architecture-plan.md`, then begin Phase 2 from the latest `main` branch. Phase 2 must be built or carefully reconstructed against migrations `0001`–`0012`; the earlier standalone artifact is not authoritative until it passes that reconciliation and the complete verification suite.
+The following are now confirmed (not just proposed defaults) and are reflected in the schema and roadmap below:
+
+1. **Seat-hold expiry: 10 minutes.** Implemented as `seat_holds.expires_at = created_at + interval '10 minutes'` at insert time, with the sweeper job (Section 3/7) releasing expired holds. Stored as a single named constant in `/lib/policy` (not scattered through the codebase) so it can become a platform-configurable setting later — e.g. moved into `platform_policy_limits` — without touching call sites.
+2. **Maximum seats per booking: 8.** This is the confirmed business rule. At the audited baseline, its enforcement is not yet trustworthy because grouping input can be client-influenced and the trigger is race-prone. The remediation gate must make the database derive the authoritative booking/hold scope and enforce the limit safely under concurrent transactions. Keep `8` as one named configuration point so it can later move into `platform_policy_limits` without redesign.
+3. **Movie catalog creation: Platform Administrator only.** This is a tightening from the v2 draft (which floated owner-submission). The `movies` table is now write-restricted to `platform_admin` in both RLS policy and application logic — cinema owners have **no** path to create or edit a `movies` row, only to `INSERT`/`DELETE` rows in `cinema_movies` (their own selection of which existing catalog titles their cinema shows). This is simpler than the previous draft, removes an entire approval-queue workflow from scope, and is fully reversible later: if you decide to allow owner-submitted movies, that's an additive `movie_submissions` table + admin review step, not a change to the existing `movies`/`cinema_movies` relationship.
+
+All three remain simple, named configuration points rather than hardcoded magic numbers/rules buried in logic, specifically so each can graduate to a database-backed, admin-editable setting later without a redesign.
 
 ---
 
-*This v3 document supersedes the earlier architecture draft wherever implementation status, authentication routes, permission vocabulary, Phase 1 security migrations, or the next-phase baseline differs.*
+## 12. Immediate Next Actions
+
+1. Fetch and verify the latest `main`; do not assume the audited SHA is still current.
+2. Open a dedicated remediation branch from that verified commit.
+3. Read the complete pre-Phase-4 audit and map every finding to affected migrations, grants, policies, functions, application call sites, and regression tests.
+4. Implement the dependency and booking-boundary fixes without starting Phase 4 feature work.
+5. Validate on a fresh isolated database, run the full suite, perform targeted concurrency and authorization tests, and document evidence.
+6. Merge only after review and green CI; then perform a focused re-audit of the new `main`.
+7. Begin Phase 4 only if the mandatory gate exit criteria are satisfied.
+
+The Moviera homepage may continue as a separately isolated UI/integration workstream using real Phase 3 data. It must not alter booking security boundaries, claim unavailable features work, or enable Phase 4 actions before the gate passes.
+
+---
+
+**Next step at this revision:** Pre-Phase-4 Security Remediation. Phase 4 remains blocked until the recorded findings are fixed, regression-tested, merged, and re-audited.

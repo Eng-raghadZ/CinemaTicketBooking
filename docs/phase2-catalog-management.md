@@ -1,5 +1,7 @@
 # Phase 2 — Catalog Management
 
+> **Completed implementation record.** This document preserves the Phase 2 implementation and hardening history. For the current project status, open security blockers, and next steps, see [`architecture-plan.md`](architecture-plan.md).
+
 *Updated after the Phase 2 hardening pass — four review rounds: catalog
 permission enforcement, column-level UPDATE scoping (including a follow-up
 for the `id` column), a screen-delete cascade guard, and showtime INSERT
