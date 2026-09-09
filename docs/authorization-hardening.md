@@ -1,5 +1,7 @@
 # Authorization Hardening — Suspended-Cinema Enforcement, Admin Route Fix, Runtime Privilege Audit
 
+> **Completed hardening record through migrations 0015–0016.** This document records fixes that are already implemented and verified. It does not include the later pre-Phase-4 audit findings. For the current security status and next required work, see [`security.md`](security.md) and [`architecture-plan.md`](architecture-plan.md).
+
 This documents a focused corrective pass driven by confirmed manual E2E
 findings, on top of the verified Phase 0–3 baseline (including the public
 browsing RLS/grant fix and pagination fix). Two new forward-only migrations

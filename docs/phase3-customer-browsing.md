@@ -1,5 +1,7 @@
 # Phase 3 — Customer Browsing
 
+> **Completed implementation record.** This document preserves the Phase 3 implementation, fixes, and verification history. Phase 3 is functionally complete, but Phase 4 remains blocked by the security-remediation gate documented in [`architecture-plan.md`](architecture-plan.md).
+
 This documents what Phase 3 adds on top of the verified Phase 0–2 baseline
 (`docs/architecture-plan.md` v3, migrations `0001`–`0013`). No existing
 migration was modified.

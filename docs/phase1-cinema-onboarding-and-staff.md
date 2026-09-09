@@ -1,5 +1,7 @@
 # Phase 1 — Cinema Onboarding & Staff
 
+> **Completed implementation record.** This document preserves the Phase 1 implementation history. For the current project status, security blockers, and next steps, see [`architecture-plan.md`](architecture-plan.md).
+
 This documents what Phase 1 adds on top of the verified Phase 0 foundations
 (schema, RLS, guards, migrations — all unchanged by this phase).
 
