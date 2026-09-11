@@ -8,7 +8,7 @@
 # production
 /build
 
-# env files — never commit real secrets
+# env files â€” never commit real secrets
 .env
 .env.local
 .env.*.local
@@ -26,4 +26,6 @@ npm-debug.log*
 next-env.d.ts
 # Supabase local generated state
 /supabase/.temp/
-/supabase/.branches/supabase/snippets/
+/supabase/.branches/
+supabase/snippets/
+
