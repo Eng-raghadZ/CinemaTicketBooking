@@ -1,13 +1,15 @@
 import { requirePlatformAdminOrRedirect } from "@/lib/auth/guards";
 import { createServerSupabaseClient } from "@/lib/auth/server";
 import { SignOutButton } from "@/app/(auth)/sign-out-button";
-import { MovieForm } from "./movie-form";
+import { MovieEditForm, MovieForm } from "./movie-form";
 
 interface MovieRow {
   id: string;
   title: string;
   description: string | null;
   poster_url: string | null;
+  hero_image_url: string | null;
+  trailer_url: string | null;
   duration_minutes: number;
   rating: string | null;
   created_at: string;
@@ -19,7 +21,9 @@ export default async function AdminMoviesPage() {
   const supabase = await createServerSupabaseClient();
   const { data } = await supabase
     .from("movies")
-    .select("id, title, description, poster_url, duration_minutes, rating, created_at")
+    .select(
+      "id, title, description, poster_url, hero_image_url, trailer_url, duration_minutes, rating, created_at",
+    )
     .order("created_at", { ascending: false });
 
   const movies = (data ?? []) as MovieRow[];
@@ -28,8 +32,9 @@ export default async function AdminMoviesPage() {
     <main>
       <h1>Movie catalog</h1>
       <p>
-        This is the platform-wide master catalog. Cinema owners select from these titles for
-        their own cinema&apos;s listing — they cannot create or edit catalog entries directly.
+        This is the platform-wide master catalog. Cinema owners select from
+        these titles for their own cinema&apos;s listing — they cannot create or
+        edit catalog entries directly.
       </p>
       <SignOutButton />
 
@@ -49,6 +54,21 @@ export default async function AdminMoviesPage() {
                 <strong>{movie.title}</strong> — {movie.duration_minutes} min
                 {movie.rating ? ` — ${movie.rating}` : ""}
                 {movie.description ? <p>{movie.description}</p> : null}
+                {movie.trailer_url ? (
+                  <p>
+                    <a
+                      href={movie.trailer_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Watch trailer
+                    </a>
+                  </p>
+                ) : null}
+                <details>
+                  <summary>Edit movie</summary>
+                  <MovieEditForm movie={movie} />
+                </details>
               </li>
             ))}
           </ul>

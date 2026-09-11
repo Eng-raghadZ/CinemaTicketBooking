@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { SignOutButton } from "@/app/(auth)/sign-out-button";
+import { getCurrentUserContext } from "@/lib/auth/server";
 
 /**
  * Shared layout for the public customer-browsing route group (Phase 3):
@@ -9,7 +11,17 @@ import Link from "next/link";
  * "/dashboard"), so they're reachable without a session, exactly as
  * required for public browsing.
  */
-export default function PublicLayout({ children }: { children: React.ReactNode }) {
+export default async function PublicLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const user =
+    process.env.NEXT_PUBLIC_SUPABASE_URL &&
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+      ? await getCurrentUserContext()
+      : null;
+
   return (
     <div>
       <nav aria-label="Browse">
@@ -21,7 +33,17 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
         {" | "}
         <Link href="/showtimes">Showtimes</Link>
         {" | "}
-        <Link href="/login">Sign in</Link>
+        {user ? (
+          <>
+            <Link href="/dashboard">Dashboard</Link>
+            {" | "}
+            <span>{user.email ?? "Account"}</span>
+            {" | "}
+            <SignOutButton />
+          </>
+        ) : (
+          <Link href="/login">Sign in</Link>
+        )}
       </nav>
       {children}
     </div>

@@ -45,6 +45,8 @@ export async function createMovie(
     title: formData.get("title"),
     description: formData.get("description"),
     posterUrl: formData.get("posterUrl"),
+    heroImageUrl: formData.get("heroImageUrl"),
+    trailerUrl: formData.get("trailerUrl"),
     durationMinutes: formData.get("durationMinutes"),
     rating: formData.get("rating"),
   });
@@ -67,6 +69,8 @@ export async function createMovie(
       title: parsed.data.title,
       description: parsed.data.description ?? null,
       poster_url: parsed.data.posterUrl ?? null,
+      hero_image_url: parsed.data.heroImageUrl ?? null,
+      trailer_url: parsed.data.trailerUrl ?? null,
       duration_minutes: parsed.data.durationMinutes,
       rating: parsed.data.rating ?? null,
       created_by: userId,
@@ -87,6 +91,7 @@ export async function createMovie(
   });
 
   revalidatePath("/dashboard/movies");
+  revalidatePath("/");
   return { ok: true, data: { movieId: data.id } };
 }
 
@@ -101,6 +106,8 @@ export async function updateMovie(
     title: formData.get("title"),
     description: formData.get("description"),
     posterUrl: formData.get("posterUrl"),
+    heroImageUrl: formData.get("heroImageUrl"),
+    trailerUrl: formData.get("trailerUrl"),
     durationMinutes: formData.get("durationMinutes"),
     rating: formData.get("rating"),
   });
@@ -120,6 +127,8 @@ export async function updateMovie(
       title: parsed.data.title,
       description: parsed.data.description ?? null,
       poster_url: parsed.data.posterUrl ?? null,
+      hero_image_url: parsed.data.heroImageUrl ?? null,
+      trailer_url: parsed.data.trailerUrl ?? null,
       duration_minutes: parsed.data.durationMinutes,
       rating: parsed.data.rating ?? null,
     })
@@ -138,6 +147,8 @@ export async function updateMovie(
   });
 
   revalidatePath("/dashboard/movies");
+  revalidatePath("/");
+  revalidatePath(`/movies/${parsed.data.movieId}`);
   return { ok: true };
 }
 

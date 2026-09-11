@@ -1,0 +1,552 @@
+.page,
+.page * {
+  box-sizing: border-box;
+}
+.page {
+  --red: #8c030a;
+  --light-red: #510b10;
+  position: fixed;
+  inset: 0;
+  min-height: 100svh;
+  height: 100svh;
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: minmax(0, 52%) minmax(420px, 48%);
+  grid-template-rows: 86px minmax(0, 1fr) 58px;
+  color: #f5f5f3;
+  background: #030708 url("/images/moviera/auth-cinema.png") center/cover no-repeat;
+  font-family: Arial, Helvetica, sans-serif;
+}
+.page::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, transparent 28%, #0205064d 49%, #020506e8 59%, #020506 100%),
+    linear-gradient(0deg, #020506e6 0, transparent 24%);
+}
+.header,
+.visual,
+.panel,
+.footer {
+  position: relative;
+  z-index: 1;
+}
+.header {
+  grid-column: 1 / -1;
+  position: fixed;
+  inset: 0 0 auto;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  min-height: 86px;
+  padding: 18px 4.7%;
+  background: linear-gradient(#060a0d99, transparent);
+}
+.brand {
+  color: white;
+  text-decoration: none;
+  display: inline-flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  font-family: "Copperplate Gothic Light", Copperplate, "Times New Roman", serif;
+  font-size: 32px;
+  font-weight: 600;
+  line-height: 0.95;
+  letter-spacing: -1.4px;
+}
+.brand small {
+  margin-top: 6px;
+  font-family: Georgia, serif;
+  font-size: 13px;
+  letter-spacing: 7px;
+}
+.nav {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: clamp(20px, 4vw, 65px);
+  font-size: 14px;
+}
+.nav a {
+  position: relative;
+  padding: 12px 0;
+  color: inherit;
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+.nav a:hover,
+.nav a:focus-visible {
+  color: var(--red);
+}
+.toggle {
+  display: none;
+}
+.visual {
+  grid-column: 1;
+  grid-row: 2;
+  display: flex;
+  align-items: flex-end;
+  padding: 0 clamp(28px, 3.2vw, 58px) clamp(36px, 6vh, 74px);
+}
+.visual h2,
+.panel h1 {
+  margin: 0;
+  font-family: "Copperplate Gothic Light", Copperplate, "Times New Roman", serif;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: -1px;
+}
+.visual h2 {
+  max-width: 650px;
+  font-size: clamp(34px, 3.35vw, 56px);
+  line-height: 1.04;
+}
+.visual p {
+  max-width: 480px;
+  margin: 14px 0 0;
+  color: #c2c2c2;
+  font-size: clamp(15px, 1.15vw, 19px);
+  line-height: 1.45;
+}
+.panel {
+  grid-column: 2;
+  grid-row: 2;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  padding: 12px clamp(44px, 6vw, 104px) 22px;
+}
+.card {
+  width: min(100%, 520px);
+}
+.eyebrow {
+  margin: 0 0 11px;
+  color: var(--red);
+  font-size: 13px;
+  text-transform: uppercase;
+}
+.panel h1 {
+  font-size: clamp(36px, 3.25vw, 52px);
+  line-height: 1.04;
+}
+.description {
+  margin: 15px 0 20px;
+  color: #b9b9b9;
+  font-size: 15px;
+  line-height: 1.55;
+}
+.form {
+  display: grid;
+  gap: 10px;
+}
+.row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+.field {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  color: #f1f1f1;
+  font-size: 12px;
+  text-transform: uppercase;
+}
+.inputWrap {
+  position: relative;
+}
+.field input {
+  width: 100%;
+  height: 44px;
+  box-sizing: border-box;
+  border: 1px solid #4e595d;
+  border-radius: 0;
+  outline: 0;
+  padding: 0 16px;
+  background: #080f10d9;
+  color: white;
+  font: inherit;
+  font-size: 15px;
+  text-transform: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.field input::placeholder {
+  color: #85898b;
+}
+.field input:focus {
+  border-color: var(--red);
+  box-shadow: inset 0 0 0 1px var(--red);
+}
+.field input:-webkit-autofill,
+.field input:-webkit-autofill:hover,
+.field input:-webkit-autofill:focus {
+  -webkit-text-fill-color: #f5f5f3;
+  caret-color: #f5f5f3;
+  box-shadow: inset 0 0 0 1000px #080f10;
+  transition: background-color 9999s ease-out;
+}
+.passwordInput {
+  padding-right: 48px !important;
+}
+.reveal {
+  position: absolute;
+  top: 50%;
+  right: 13px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  color: #b5b5b5;
+  background: transparent;
+  transform: translateY(-50%);
+  cursor: pointer;
+}
+.reveal:hover,
+.reveal:focus-visible {
+  color: var(--red);
+}
+.reveal svg {
+  width: 21px;
+  height: 21px;
+}
+.options {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  color: #c2c2c2;
+  font-size: 13px;
+}
+.check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #c8c8c8;
+  font-size: 13px;
+  text-transform: none;
+}
+.check input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--red);
+}
+.check em {
+  color: var(--red);
+  font-style: normal;
+}
+.primary,
+.oauth {
+  width: 100%;
+  height: 44px;
+  border-radius: 0;
+  color: white;
+  font-family: "Copperplate Gothic Light", Copperplate, "Times New Roman", serif;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.035em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+.primary {
+  border: 1px solid var(--red);
+  background: var(--red);
+}
+.primary:hover,
+.primary:focus-visible {
+  border-color: #b20b14;
+  background: #6f0208;
+}
+.primary:disabled,
+.oauth:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+.divider {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 18px;
+  color: #b9b9b9;
+  font-size: 13px;
+}
+.divider::before,
+.divider::after {
+  content: "";
+  height: 1px;
+  background: #6b6f70;
+}
+.oauth {
+  border: 1px solid #777d7f;
+  background: #05090b99;
+}
+.oauth:hover,
+.oauth:focus-visible {
+  border-color: var(--red);
+  color: var(--red);
+}
+.oauth strong {
+  margin-right: 12px;
+  color: #4285f4;
+  font-size: 18px;
+}
+.switch {
+  margin: 8px 0 0;
+  text-align: center;
+  color: #f2f2f2;
+  font-size: 13px;
+}
+.switch a,
+.options button {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--red);
+  text-decoration: none;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.switch a:hover,
+.switch a:focus-visible,
+.options button:hover,
+.options button:focus-visible {
+  color: #b80a13;
+}
+.message,
+.error {
+  margin: 0;
+  padding: 8px 10px;
+  font-size: 13px;
+  line-height: 1.35;
+  text-transform: none;
+}
+.message {
+  border-left: 2px solid #62b887;
+  color: #bce8cf;
+  background: #17382770;
+}
+.error {
+  border-left: 2px solid var(--red);
+  color: #ffc5c9;
+  background: #40101780;
+}
+.secure {
+  margin: 22px 0 0;
+  color: #95999b;
+  text-align: center;
+  font-size: 13px;
+}
+.footer {
+  grid-column: 1 / -1;
+  grid-row: 3;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 clamp(28px, 3.2vw, 58px);
+  border-top: 1px solid #383e40;
+  color: #a5a8aa;
+  font-size: 12px;
+}
+.footer div {
+  display: flex;
+  gap: 38px;
+}
+@media (max-width: 1024px) {
+  .field {
+    gap: 8px;
+  }
+  .page {
+    grid-template-columns: 1fr;
+    grid-template-rows: 70px minmax(0, 1fr) 48px;
+    background-position: 36% center;
+  }
+  .page::after {
+    background: #020506a8;
+  }
+  .header {
+    padding-inline: clamp(20px, 5vw, 44px);
+  }
+  .nav {
+    gap: clamp(18px, 3.6vw, 36px);
+  }
+  .visual {
+    display: none;
+  }
+  .panel {
+    grid-column: 1;
+    grid-row: 2;
+    padding: 10px 22px;
+  }
+  .card {
+    width: min(100%, 560px);
+    box-sizing: border-box;
+    padding: clamp(20px, 3.5vh, 34px) clamp(20px, 4vw, 38px);
+    border: 1px solid #4b5154;
+    background: #030708e8;
+    box-shadow: 0 22px 70px #000b;
+  }
+  .panel h1 {
+    font-size: clamp(36px, 7vw, 52px);
+  }
+  .description {
+    margin-bottom: 18px;
+  }
+}
+@media (max-width: 640px) {
+  .page {
+    grid-template-rows: 56px minmax(0, 1fr);
+  }
+  .header {
+    min-height: 76px;
+    gap: 12px;
+    padding: 14px 20px;
+  }
+  .brand {
+    font-size: 27px;
+  }
+  .brand small {
+    font-size: 10px;
+    letter-spacing: 6px;
+  }
+  .toggle {
+    display: block;
+    margin-left: auto;
+    padding: 8px;
+    border: 0;
+    background: transparent;
+    color: white;
+    font: inherit;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  .nav {
+    display: none;
+    position: absolute;
+    top: 76px;
+    right: 0;
+    left: 0;
+    padding: 18px 25px;
+    border-bottom: 1px solid #566;
+    background: #0b1115;
+    transform: none;
+  }
+  .nav.open {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 7px;
+  }
+  .panel {
+    padding: 8px 12px 12px;
+  }
+  .card {
+    width: min(100%, 460px);
+    padding: clamp(15px, 2.4vh, 24px) 18px;
+  }
+  .panel h1 {
+    font-size: clamp(33px, 11vw, 45px);
+  }
+  .eyebrow {
+    margin-bottom: 6px;
+    font-size: 12px;
+  }
+  .description {
+    margin: 8px 0 13px;
+    font-size: 13px;
+    line-height: 1.35;
+  }
+  .form {
+    gap: 10px;
+  }
+  .row {
+    gap: 10px;
+  }
+  .field {
+    gap: 8px;
+    font-size: 11px;
+  }
+  .field input {
+    height: 40px;
+    padding-inline: 11px;
+    font-size: 13px;
+  }
+  .primary,
+  .oauth {
+    height: 41px;
+    font-size: 12px;
+  }
+  .secure,
+  .footer {
+    display: none;
+  }
+  .check,
+  .options,
+  .switch,
+  .divider {
+    font-size: 11px;
+  }
+}
+@media (max-width: 440px) {
+  .row {
+    grid-template-columns: 1fr;
+  }
+  .card:has(.signupCard) .description,
+  .card:has(.signupCard) .secure,
+  .signupCard .divider,
+  .signupCard .oauth {
+    display: none;
+  }
+}
+@media (max-height: 720px) {
+  .page {
+    grid-template-rows: 56px minmax(0, 1fr);
+  }
+  .footer,
+  .secure {
+    display: none;
+  }
+  .header {
+    padding-block: 6px;
+  }
+  .panel {
+    padding-block: 5px 9px;
+  }
+  .card {
+    padding-top: 14px;
+    padding-bottom: 14px;
+  }
+  .description {
+    margin: 7px 0 11px;
+    font-size: 13px;
+  }
+  .form {
+    gap: 9px;
+  }
+  .field {
+    font-size: 11px;
+  }
+  .field input,
+  .primary,
+  .oauth {
+    height: 39px;
+  }
+  .panel h1 {
+    font-size: 38px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .page *,
+  .page *::before,
+  .page *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}

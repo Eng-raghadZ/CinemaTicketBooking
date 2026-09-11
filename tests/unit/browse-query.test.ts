@@ -7,6 +7,7 @@ import {
   escapeIlikeWildcards,
   firstParam,
   isRangeNotSatisfiableError,
+  isShowtimeOngoingOrUpcoming,
   isValidUuid,
   parseDateParam,
   parsePageParam,
@@ -16,6 +17,27 @@ import {
   totalPages,
   utcDayBounds,
 } from "@/lib/catalog/browse-query";
+
+describe("isShowtimeOngoingOrUpcoming", () => {
+  const now = new Date("2026-09-10T12:30:00.000Z");
+
+  it("keeps a movie visible while its showtime is still running", () => {
+    expect(isShowtimeOngoingOrUpcoming("2026-09-10T12:00:00.000Z", 120, now)).toBe(true);
+  });
+
+  it("keeps a future showtime visible", () => {
+    expect(isShowtimeOngoingOrUpcoming("2026-09-10T19:00:00.000Z", 90, now)).toBe(true);
+  });
+
+  it("removes a movie once the showtime has ended", () => {
+    expect(isShowtimeOngoingOrUpcoming("2026-09-10T09:00:00.000Z", 120, now)).toBe(false);
+  });
+
+  it("rejects invalid dates and durations", () => {
+    expect(isShowtimeOngoingOrUpcoming("invalid", 120, now)).toBe(false);
+    expect(isShowtimeOngoingOrUpcoming("2026-09-10T12:00:00.000Z", 0, now)).toBe(false);
+  });
+});
 
 describe("firstParam", () => {
   it("returns the value unchanged for a plain string", () => {

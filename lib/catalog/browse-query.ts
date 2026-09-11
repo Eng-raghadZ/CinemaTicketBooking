@@ -127,6 +127,19 @@ export function utcDayBounds(dateStr: string): { start: Date; end: Date } | null
   return { start, end };
 }
 
+/** True while a showtime is running, and for every showtime that has not started yet. */
+export function isShowtimeOngoingOrUpcoming(
+  startsAt: string | Date,
+  durationMinutes: number,
+  now = new Date(),
+): boolean {
+  const startMs = startsAt instanceof Date ? startsAt.getTime() : new Date(startsAt).getTime();
+  if (!Number.isFinite(startMs) || !Number.isFinite(durationMinutes) || durationMinutes <= 0) {
+    return false;
+  }
+  return startMs + durationMinutes * 60_000 > now.getTime();
+}
+
 export interface PageResolution {
   /** The page to actually query/render — always <= `pages`. */
   page: number;

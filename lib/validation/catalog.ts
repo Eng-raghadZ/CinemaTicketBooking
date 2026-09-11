@@ -23,6 +23,16 @@ const optionalTrimmed = (max: number) =>
     .or(z.literal(""))
     .transform((v) => (v ? v : undefined));
 
+const optionalHttpUrl = z
+  .string()
+  .trim()
+  .url("Must be a valid URL")
+  .max(2000)
+  .refine((value) => /^https?:\/\//i.test(value), "Must use http:// or https://")
+  .optional()
+  .or(z.literal(""))
+  .transform((value) => (value ? value : undefined));
+
 // ---------------------------------------------------------------------------
 // MOVIES — platform-admin-only master catalog (architecture-plan.md
 // Section 11, Decision 3). Cinema owners never create/edit a `movies` row —
@@ -40,6 +50,8 @@ export const movieSchema = z.object({
     .optional()
     .or(z.literal(""))
     .transform((v) => (v ? v : undefined)),
+  heroImageUrl: optionalHttpUrl,
+  trailerUrl: optionalHttpUrl,
   durationMinutes: z.coerce
     .number()
     .int("Duration must be a whole number of minutes")

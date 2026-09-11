@@ -53,6 +53,24 @@ describe("registerCinemaSchema", () => {
       expect(result.data.location).toBeUndefined();
     }
   });
+
+  it("accepts an HTTP(S) cover image and rejects unsafe protocols", () => {
+    const valid = registerCinemaSchema.safeParse({
+      name: "Riverside",
+      countryCode: "US",
+      currencyCode: "USD",
+      coverImageUrl: "https://images.example.com/cinema.jpg",
+    });
+    expect(valid.success).toBe(true);
+
+    const invalid = registerCinemaSchema.safeParse({
+      name: "Riverside",
+      countryCode: "US",
+      currencyCode: "USD",
+      coverImageUrl: "javascript:alert(1)",
+    });
+    expect(invalid.success).toBe(false);
+  });
 });
 
 describe("rejectCinemaSchema", () => {

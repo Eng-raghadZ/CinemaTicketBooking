@@ -45,6 +45,44 @@ describe("movieSchema", () => {
     expect(empty.success).toBe(true);
     if (empty.success) expect(empty.data.posterUrl).toBeUndefined();
   });
+
+  it("accepts an HTTPS trailer URL and normalizes an empty one", () => {
+    const valid = movieSchema.safeParse({
+      title: "X",
+      durationMinutes: 100,
+      trailerUrl: "https://www.youtube.com/watch?v=example",
+    });
+    expect(valid.success).toBe(true);
+
+    const empty = movieSchema.safeParse({ title: "X", durationMinutes: 100, trailerUrl: "" });
+    expect(empty.success).toBe(true);
+    if (empty.success) expect(empty.data.trailerUrl).toBeUndefined();
+  });
+
+  it("rejects non-HTTP trailer protocols", () => {
+    const result = movieSchema.safeParse({
+      title: "X",
+      durationMinutes: 100,
+      trailerUrl: "javascript:alert(1)",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts a separate HTTP(S) hero image and rejects unsafe protocols", () => {
+    const valid = movieSchema.safeParse({
+      title: "X",
+      durationMinutes: 100,
+      heroImageUrl: "https://images.example.com/wide-hero.jpg",
+    });
+    expect(valid.success).toBe(true);
+
+    const invalid = movieSchema.safeParse({
+      title: "X",
+      durationMinutes: 100,
+      heroImageUrl: "data:image/svg+xml,test",
+    });
+    expect(invalid.success).toBe(false);
+  });
 });
 
 describe("updateMovieSchema", () => {

@@ -124,6 +124,7 @@ export const cinemas = pgTable("cinemas", {
   name: text("name").notNull(),
   description: text("description"),
   location: text("location"),
+  coverImageUrl: text("cover_image_url"),
   countryCode: text("country_code").notNull(), // single value in v2 — see Decision 5
   currencyCode: text("currency_code").notNull(), // single value in v2 — see Decision 5
   status: cinemaStatusEnum("status").notNull().default("pending_review"),
@@ -212,6 +213,8 @@ export const movies = pgTable("movies", {
   title: text("title").notNull(),
   description: text("description"),
   posterUrl: text("poster_url"),
+  heroImageUrl: text("hero_image_url"),
+  trailerUrl: text("trailer_url"),
   durationMinutes: integer("duration_minutes").notNull(),
   rating: text("rating"),
   createdBy: uuid("created_by")

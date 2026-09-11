@@ -459,3 +459,6 @@ and a future showtime in the database):
    `/booking-unavailable` and that page links back correctly.
 7. Try `/cinemas/<a-real-pending-review-cinema-id>` (as an admin, look one
    up) — confirm it 404s for a logged-out visitor.
+8. While signed in, open `/movies`, `/cinemas`, and `/showtimes` — confirm
+   the public navigation keeps the session visible and offers Dashboard and
+   Sign out instead of Sign in.

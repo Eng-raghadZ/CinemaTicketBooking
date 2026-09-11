@@ -16,10 +16,21 @@ const optionalTrimmed = (max: number) =>
     .or(z.literal(""))
     .transform((v) => (v ? v : undefined));
 
+const optionalHttpUrl = z
+  .string()
+  .trim()
+  .url("Must be a valid URL")
+  .max(2000)
+  .refine((value) => /^https?:\/\//i.test(value), "Must use http:// or https://")
+  .optional()
+  .or(z.literal(""))
+  .transform((value) => (value ? value : undefined));
+
 export const registerCinemaSchema = z.object({
   name: z.string().trim().min(2, "Name must be at least 2 characters").max(200),
   description: optionalTrimmed(2000),
   location: optionalTrimmed(500),
+  coverImageUrl: optionalHttpUrl,
   // Single-currency-per-cinema is enforced in application logic, not schema,
   // per architecture-plan.md Decision 5 — this validates the *shape* only.
   countryCode: z
@@ -38,6 +49,10 @@ export type RegisterCinemaInput = z.infer<typeof registerCinemaSchema>;
 
 export const cinemaIdSchema = z.object({
   cinemaId: z.string().uuid(),
+});
+
+export const updateCinemaCoverSchema = cinemaIdSchema.extend({
+  coverImageUrl: optionalHttpUrl,
 });
 
 export const rejectCinemaSchema = z.object({

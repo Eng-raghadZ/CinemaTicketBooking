@@ -12,12 +12,14 @@ import { revalidatePath } from "next/cache";
 import { createServerSupabaseClient } from "@/lib/auth/server";
 import {
   requireAuthenticatedUser,
+  requireCinemaStaff,
   requirePlatformAdmin,
 } from "@/lib/auth/guards";
 import {
   registerCinemaSchema,
   rejectCinemaSchema,
   cinemaIdSchema,
+  updateCinemaCoverSchema,
 } from "@/lib/validation/cinema";
 import { serviceDb } from "@/lib/db/client";
 import { auditLogs } from "@/lib/db/schema";
@@ -73,6 +75,7 @@ export async function registerCinema(
     name: formData.get("name"),
     description: formData.get("description"),
     location: formData.get("location"),
+    coverImageUrl: formData.get("coverImageUrl"),
     countryCode: formData.get("countryCode"),
     currencyCode: formData.get("currencyCode"),
   });
@@ -93,6 +96,7 @@ export async function registerCinema(
       name: parsed.data.name,
       description: parsed.data.description ?? null,
       location: parsed.data.location ?? null,
+      cover_image_url: parsed.data.coverImageUrl ?? null,
       country_code: parsed.data.countryCode,
       currency_code: parsed.data.currencyCode,
       // status intentionally omitted — defaults to 'pending_review' and is
@@ -108,6 +112,41 @@ export async function registerCinema(
 
   revalidatePath("/dashboard");
   return { ok: true, data: { cinemaId: data.id } };
+}
+
+export async function updateCinemaCover(
+  _prev: ActionResult,
+  formData: FormData,
+): Promise<ActionResult> {
+  const parsed = updateCinemaCoverSchema.safeParse({
+    cinemaId: formData.get("cinemaId"),
+    coverImageUrl: formData.get("coverImageUrl"),
+  });
+  if (!parsed.success) {
+    return {
+      ok: false,
+      error: "Please enter a valid public HTTP(S) image URL.",
+      fieldErrors: parsed.error.flatten().fieldErrors,
+    };
+  }
+
+  await requireCinemaStaff(parsed.data.cinemaId, { minRole: "owner" });
+  const supabase = await createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("cinemas")
+    .update({ cover_image_url: parsed.data.coverImageUrl ?? null })
+    .eq("id", parsed.data.cinemaId)
+    .select("id")
+    .maybeSingle();
+
+  if (error) return { ok: false, error: "Could not update cinema cover." };
+  if (!data) return { ok: false, error: "Cinema not found or cannot be updated." };
+
+  revalidatePath("/");
+  revalidatePath("/cinemas");
+  revalidatePath(`/cinemas/${parsed.data.cinemaId}`);
+  revalidatePath(`/dashboard/${parsed.data.cinemaId}`);
+  return { ok: true };
 }
 
 export async function approveCinema(

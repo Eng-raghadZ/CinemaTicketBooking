@@ -4,6 +4,7 @@ import { requireCinemaStaffOrRedirect } from "@/lib/auth/guards";
 import { cinemaDashboardNavLabels, type CinemaStaffMembership } from "@/lib/auth/permissions";
 import { createServerSupabaseClient } from "@/lib/auth/server";
 import { SignOutButton } from "@/app/(auth)/sign-out-button";
+import { CinemaCoverForm } from "./cinema-cover-form";
 
 type CinemaDashboardPageProps = {
   params: Promise<{ cinemaId: string }>;
@@ -14,13 +15,13 @@ export default async function CinemaDashboardPage({
 }: CinemaDashboardPageProps) {
   const { cinemaId } = await params;
 
-  const { userId } = await requireCinemaStaffOrRedirect(cinemaId);
+  const { userId, role } = await requireCinemaStaffOrRedirect(cinemaId);
 
   const supabase = await createServerSupabaseClient();
   const [{ data: cinema, error }, { data: membership }] = await Promise.all([
     supabase
       .from("cinemas")
-      .select("id, name, status, rejection_reason")
+      .select("id, name, status, rejection_reason, cover_image_url")
       .eq("id", cinemaId)
       .single(),
     // Fetch the caller's own permissions (not just role) so the nav below
@@ -81,6 +82,16 @@ export default async function CinemaDashboardPage({
         {" | "}
         <Link href={`/dashboard/${cinema.id}/showtimes`}>{navLabels.showtimes}</Link>
       </nav>
+
+      {role === "owner" && cinema.status !== "suspended" && (
+        <section>
+          <h2>Cinema artwork</h2>
+          <CinemaCoverForm
+            cinemaId={cinema.id}
+            coverImageUrl={cinema.cover_image_url}
+          />
+        </section>
+      )}
 
       <p>
         <Link href="/dashboard">Back to your cinemas</Link>

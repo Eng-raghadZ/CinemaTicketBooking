@@ -45,6 +45,14 @@ export function RegisterCinemaForm() {
       </label>
 
       <label>
+        Cinema cover image URL
+        <input name="coverImageUrl" type="url" maxLength={2000} />
+      </label>
+      {!state.ok && state.fieldErrors?.coverImageUrl && (
+        <p role="alert">{state.fieldErrors.coverImageUrl[0]}</p>
+      )}
+
+      <label>
         Country code (ISO 3166-1 alpha-2, e.g. US)
         <input name="countryCode" required maxLength={2} />
       </label>

@@ -44,6 +44,17 @@ Phase 2 build, which is unchanged.
 
 ### Master movie catalog (admin-only)
 
+Migration `0017_movie_trailer_url.sql` adds an optional, validated HTTP(S)
+`trailer_url` to the master movie record. Platform admins can set it while
+creating a movie or edit it later from the catalog page. The public homepage
+uses this value for its trailer action and never invents a trailer link.
+
+Migration `0018_catalog_artwork_urls.sql` separates wide movie hero artwork
+(`movies.hero_image_url`) from portrait posters and adds an optional cinema
+cover (`cinemas.cover_image_url`). Platform admins manage movie artwork;
+active cinema owners may update only their own non-suspended cinema cover.
+Existing rows remain valid when either URL is empty.
+
 `createMovie` / `updateMovie` run through `requirePlatformAdmin()` (layer 2)
 and the caller's own RLS-scoped client, so `movies_write_admin_only`
 (layer 3) is the final backstop — same defense-in-depth pattern as Phase 1's
