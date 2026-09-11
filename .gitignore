@@ -26,4 +26,4 @@ npm-debug.log*
 next-env.d.ts
 # Supabase local generated state
 /supabase/.temp/
-/supabase/.branches/
+/supabase/.branches/supabase/snippets/
