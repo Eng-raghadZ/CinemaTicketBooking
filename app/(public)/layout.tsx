@@ -1,6 +1,5 @@
-import Link from "next/link";
-import { SignOutButton } from "@/app/(auth)/sign-out-button";
 import { getCurrentUserContext } from "@/lib/auth/server";
+import { PublicRouteLayout } from "./public-route-layout";
 
 /**
  * Shared layout for the public customer-browsing route group (Phase 3):
@@ -23,29 +22,6 @@ export default async function PublicLayout({
       : null;
 
   return (
-    <div>
-      <nav aria-label="Browse">
-        <Link href="/">Home</Link>
-        {" | "}
-        <Link href="/cinemas">Cinemas</Link>
-        {" | "}
-        <Link href="/movies">Movies</Link>
-        {" | "}
-        <Link href="/showtimes">Showtimes</Link>
-        {" | "}
-        {user ? (
-          <>
-            <Link href="/dashboard">Dashboard</Link>
-            {" | "}
-            <span>{user.email ?? "Account"}</span>
-            {" | "}
-            <SignOutButton />
-          </>
-        ) : (
-          <Link href="/login">Sign in</Link>
-        )}
-      </nav>
-      {children}
-    </div>
+    <PublicRouteLayout email={user?.email ?? null}>{children}</PublicRouteLayout>
   );
 }

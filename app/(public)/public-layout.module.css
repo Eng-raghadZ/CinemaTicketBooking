@@ -1,0 +1,6 @@
+.cinemaShell {
+  margin: -8px;
+  min-height: 100vh;
+  overflow-x: clip;
+  background: #080f10;
+}
